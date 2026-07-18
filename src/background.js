@@ -52,6 +52,10 @@ function validatePurchaseSender(sender) {
   return validateExtensionSender(sender, chrome.runtime.id, "purchase");
 }
 
+function validateNeopetsSender(sender) {
+  return validateExtensionSender(sender, chrome.runtime.id, "neopets");
+}
+
 async function getPricingSettings() {
   const data = await loadAppData();
   const settings = data.settings.autoPricing;
@@ -553,6 +557,13 @@ async function recordPurchaseVerification(message, sender) {
 async function routeMessage(message, sender) {
   if (!isPlainObject(message) || typeof message.type !== "string") {
     throw userError("Unexpected extension message.");
+  }
+  if (message.type === MESSAGE_TYPES.openOptions) {
+    if (!validateNeopetsSender(sender)) {
+      throw userError("Settings can only be opened from a supported Neopets page.");
+    }
+    await chrome.runtime.openOptionsPage();
+    return { ok: true };
   }
   if (message.type === MESSAGE_TYPES.lookupPrice) {
     if (!validatePricingSender(sender))

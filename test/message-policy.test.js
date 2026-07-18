@@ -14,6 +14,7 @@ test("message sender validation binds the extension ID, tab, and exact feature p
     tab: { id: 2, url: "https://www.neopets.com/shops/wizard.phtml" },
   };
   assert.equal(validateExtensionSender(pricingSender, extensionId, "pricing"), true);
+  assert.equal(validateExtensionSender(pricingSender, extensionId, "neopets"), true);
   assert.equal(validateExtensionSender(pricingSender, extensionId, "purchase"), false);
   assert.equal(validateExtensionSender(purchaseSender, extensionId, "purchase"), true);
   assert.equal(
@@ -28,6 +29,17 @@ test("message sender validation binds the extension ID, tab, and exact feature p
       },
       extensionId,
       "purchase",
+    ),
+    false,
+  );
+  assert.equal(
+    validateExtensionSender(
+      {
+        id: extensionId,
+        tab: { id: 4, url: "https://evil.example/?next=https://www.neopets.com" },
+      },
+      extensionId,
+      "neopets",
     ),
     false,
   );

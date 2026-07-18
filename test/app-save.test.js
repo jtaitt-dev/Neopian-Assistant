@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NeopianAssistantApp } from "../src/content/app.js";
+import { NeopianAssistantApp, requestOptionsPage } from "../src/content/app.js";
+
+test("content pages request settings through the validated background route", async () => {
+  const messages = [];
+  const response = await requestOptionsPage(async (message) => {
+    messages.push(message);
+    return { ok: true };
+  });
+
+  assert.deepEqual(messages, [{ type: "extension.openOptions" }]);
+  assert.deepEqual(response, { ok: true });
+});
+
+test("content pages reject a failed settings request", async () => {
+  await assert.rejects(
+    requestOptionsPage(async () => ({ ok: false, error: "Settings route unavailable." })),
+    /Settings route unavailable/,
+  );
+});
 
 test("application saves are serialized without replacing shared controller data", async () => {
   const data = { settings: { autoPricing: { enabled: false } } };

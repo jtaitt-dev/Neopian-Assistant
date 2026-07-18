@@ -22,6 +22,7 @@ export const LEGACY_STORAGE_KEYS = Object.freeze({
 });
 
 export const MESSAGE_TYPES = Object.freeze({
+  openOptions: "extension.openOptions",
   lookupPrice: "shop.lookupPrice",
   cancelPriceRun: "shop.cancelPriceRun",
   preparePriceApply: "shop.preparePriceApply",

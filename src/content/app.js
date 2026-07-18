@@ -1,4 +1,4 @@
-import { BRAND } from "../shared/constants.js";
+import { BRAND, MESSAGE_TYPES } from "../shared/constants.js";
 import { element, icon, setStatus } from "../shared/dom.js";
 import { saveAppData } from "../shared/storage.js";
 import {
@@ -21,6 +21,16 @@ function formatRemaining(milliseconds) {
 
 function buttonWithIcon(label, iconName, attributes = {}) {
   return element("button", { type: "button", ...attributes }, [icon(iconName), label]);
+}
+
+export async function requestOptionsPage(
+  sendMessage = (message) => chrome.runtime.sendMessage(message),
+) {
+  const response = await sendMessage({ type: MESSAGE_TYPES.openOptions });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Neopian Assistant settings could not be opened.");
+  }
+  return response;
 }
 
 export class NeopianAssistantApp {
@@ -51,6 +61,14 @@ export class NeopianAssistantApp {
 
   announce(message, tone = "neutral") {
     if (this.status) setStatus(this.status, message, tone);
+  }
+
+  async openOptions() {
+    try {
+      await requestOptionsPage();
+    } catch {
+      this.announce("Neopian Assistant settings could not be opened.", "error");
+    }
   }
 
   mount() {
@@ -91,7 +109,7 @@ export class NeopianAssistantApp {
             className: "na-icon-button",
             ariaLabel: "Open Neopian Assistant settings",
             title: "Settings",
-            onClick: () => chrome.runtime.openOptionsPage(),
+            onClick: () => this.openOptions(),
           },
           icon("gear"),
         ),
@@ -236,7 +254,7 @@ export class NeopianAssistantApp {
           }),
           buttonWithIcon("Open settings", "gear", {
             className: "na-button na-button--primary",
-            onClick: () => chrome.runtime.openOptionsPage(),
+            onClick: () => this.openOptions(),
           }),
         ]),
       );

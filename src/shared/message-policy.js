@@ -1,4 +1,4 @@
-import { isOwnShopStockUrl, isShopWizardUrl } from "./validation.js";
+import { isAllowedNeopetsPageUrl, isOwnShopStockUrl, isShopWizardUrl } from "./validation.js";
 
 export function validateExtensionSender(sender, extensionId, pageKind) {
   if (
@@ -9,6 +9,7 @@ export function validateExtensionSender(sender, extensionId, pageKind) {
   ) {
     return false;
   }
+  if (pageKind === "neopets") return isAllowedNeopetsPageUrl(sender.tab.url);
   if (pageKind === "pricing") return isOwnShopStockUrl(sender.tab.url);
   if (pageKind === "purchase") return isShopWizardUrl(sender.tab.url);
   return false;
