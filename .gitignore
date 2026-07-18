@@ -1,0 +1,69 @@
+# Dependencies and package-manager caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Environment, credentials, and local overrides
+.env
+.env.*
+!.env.example
+*.local
+*.credentials.*
+*.token
+*.pem
+*.key
+
+# Browser and account data
+User Data/
+Chrome User Data/
+chrome-user-data/
+browser-profile/
+browser-profiles/
+profile-*/
+Default/
+Cookies
+Cookies-journal
+Sessions/
+Local Storage/
+IndexedDB/
+Service Worker/
+WebStorage/
+*.har
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs, diagnostics, and test output
+*.log
+logs/
+debug/
+coverage/
+test-results/
+playwright-report/
+.nyc_output/
+
+# Build caches and local release artifacts
+.cache/
+.parcel-cache/
+.vite/
+.eslintcache
+dist/
+release/
+releases/
+*.zip
+*.crx
+*.map
+
+# Temporary, editor, and operating-system files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.code-workspace

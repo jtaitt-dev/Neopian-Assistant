@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Neopets: Dailies OS (JT$ v7.5 Pro+)",
+  "version": "7.7.9",
+  "description": "The ultimate Neopets dashboard, now as a Chrome extension with Shop Pricer and Faerie Quest modules.",
+  "icons": {
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.neopets.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.neopets.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "modules/app.js"
+      ],
+      "matches": ["*://*.neopets.com/*"]
+    }
+  ],
+  "action": {
+    "default_title": "Neopets Dailies OS"
+  }
+}
