@@ -57,6 +57,8 @@ across tabs, submitted once, and verified before success.
 - Fixed duplicate dailies rendering and CSS that incorrectly exposed inactive Auto Pricing controls.
 - Added reproducible build, lockfile, formatting, linting, tests, validation, secret scan, CI, and
   release archive generation.
+- Standardized development branches under enforced feature/fix/hotfix/refactor/docs/test/chore
+  prefixes with lowercase kebab-case descriptions.
 
 ## Security improvements
 
@@ -127,9 +129,10 @@ across tabs, submitted once, and verified before success.
 - `npm ci` — passed; 31 packages installed from the lockfile.
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities.
 - `npm run format:check` — passed.
-- `npm run lint` — passed; 59 files, no fixes or warnings.
-- `npm test` — passed; 28 tests, 28 passed, 0 failed, 0 skipped.
-- `npm run test:coverage` — passed; 54.50% aggregate line coverage, with UI behavior additionally
+- `npm run lint` — passed; 61 files, no fixes or warnings.
+- `npm test` — passed; 31 tests, 31 passed, 0 failed, 0 skipped.
+- `npm run validate:branch -- feature/neopian-assistant-audit-rebrand` — passed.
+- `npm run test:coverage` — passed; 55.43% aggregate line coverage, with UI behavior additionally
   exercised in the real-browser smoke suite.
 - `npm run build` — passed; production output in `dist/`.
 - `npm run validate` — passed; Manifest V3, 11 references, icons/alpha, CSP-safe HTML,

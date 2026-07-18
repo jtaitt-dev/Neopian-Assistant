@@ -11,7 +11,7 @@ credential-free profile
 
 - Prettier format verification.
 - Biome lint with no warnings.
-- 28 Node behavioral tests, 28 passed, 0 failed, 0 skipped.
+- 31 Node behavioral tests, 31 passed, 0 failed, 0 skipped.
 - esbuild production build.
 - Manifest V3, file reference, icon dimension/alpha, CSP-safe HTML, branding/version, unsafe API,
   and production surface validation.

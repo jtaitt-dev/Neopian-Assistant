@@ -2,7 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, "codex/**"]
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "hotfix/**"
+      - "refactor/**"
+      - "docs/**"
+      - "test/**"
+      - "chore/**"
   pull_request:
     branches: [main]
 
@@ -25,6 +33,12 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Validate pull-request branch name
+        if: github.event_name == 'pull_request'
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: npm run validate:branch -- "$BRANCH_NAME"
 
       - name: Audit production and development dependencies
         run: npm audit --audit-level=high

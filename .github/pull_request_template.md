@@ -14,6 +14,7 @@ Describe the user-visible outcome and affected extension surfaces.
 
 ## Validation
 
+- [ ] The branch uses an approved prefix and a lowercase kebab-case description.
 - [ ] `npm ci`
 - [ ] `npm audit --audit-level=high`
 - [ ] `npm run verify`

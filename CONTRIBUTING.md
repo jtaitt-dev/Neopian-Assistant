@@ -28,7 +28,7 @@ esbuild, Biome, Prettier, and Node's built-in test runner.
 
 ## Development workflow
 
-1. Create a focused branch.
+1. Create a focused branch using the naming convention below.
 2. Use `npm run dev` for rebuild-on-change development.
 3. Add behavioral tests for validation, parsing, storage, message schemas, locking, or
    consequential-operation changes.
@@ -38,6 +38,30 @@ esbuild, Biome, Prettier, and Node's built-in test runner.
    during automated tests.
 7. Run `npm run package` only after verification passes.
 8. Review staged filenames, staged diff, and secret-scan output before committing.
+
+## Branch naming
+
+Every development branch must use one of these prefixes:
+
+| Prefix      | Use                                         |
+| ----------- | ------------------------------------------- |
+| `feature/`  | New functionality                           |
+| `fix/`      | Normal bug fix                              |
+| `hotfix/`   | Urgent production fix                       |
+| `refactor/` | Code cleanup without changing behavior      |
+| `docs/`     | Documentation                               |
+| `test/`     | Tests                                       |
+| `chore/`    | Maintenance, dependencies, or configuration |
+
+Follow the prefix with a concise lowercase kebab-case description. Do not add another slash.
+Examples: `feature/add-shop-filter`, `fix/pricing-lock-timeout`, and `docs/update-store-guide`.
+Branch names are limited to 80 characters. Pull-request CI enforces this convention.
+
+Check a name locally before pushing:
+
+```powershell
+npm run validate:branch -- feature/add-shop-filter
+```
 
 ## Code style
 

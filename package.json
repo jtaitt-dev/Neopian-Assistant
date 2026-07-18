@@ -13,6 +13,7 @@
     "test:coverage": "node --test --experimental-test-coverage",
     "build": "node scripts/build.mjs",
     "validate": "node scripts/validate.mjs",
+    "validate:branch": "node scripts/validate-branch-name.mjs",
     "secret-scan": "node scripts/secret-scan.mjs",
     "package": "node scripts/package.mjs",
     "verify": "npm run format:check && npm run lint && npm test && npm run build && npm run validate && npm run secret-scan"
