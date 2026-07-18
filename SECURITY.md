@@ -1,0 +1,60 @@
+# Security Policy
+
+## Supported versions
+
+Security fixes are provided for the latest version on the `main` branch. The currently supported
+extension release is 7.8.x.
+
+## Reporting a vulnerability
+
+Do not publish credentials, cookies, session data, account identifiers, private price/shop history,
+proof-of-concept exploits, or detailed reproduction steps in a normal public issue.
+
+GitHub private vulnerability reporting is not currently enabled for this repository. For a
+potentially sensitive finding, open a minimal issue that asks the maintainer to establish a private
+reporting channel, but include no exploit details or sensitive data. Repository maintainers can then
+create a private draft security advisory and invite the reporter. Non-sensitive defense-in-depth
+suggestions may use a normal issue.
+
+When reporting privately, include:
+
+- Affected version and component.
+- Impact and realistic preconditions.
+- Minimal reproduction steps using synthetic data.
+- Suggested mitigation, if known.
+- Whether any real credential or account data may have been exposed.
+
+Allow a reasonable remediation window before public disclosure. Do not test against accounts, shops,
+or data you do not own or control.
+
+## Scope
+
+In scope:
+
+- Manifest permissions and content-script isolation.
+- Service-worker message validation and fixed network destinations.
+- Auto Pricing validation, confirmation, locking, idempotency, and verification.
+- Storage validation and migration.
+- Import/export behavior and unsafe DOM rendering.
+- Build, packaging, dependency, and secret-exposure risks.
+
+Out of scope:
+
+- Neopets service vulnerabilities unrelated to this extension.
+- Social engineering, denial of service, rate-limit abuse, or account access without authorization.
+- Reports that require CAPTCHA bypass, credential interception, cookie extraction, stealth
+  automation, or security-control circumvention.
+
+## Sensitive-data guidance
+
+Use synthetic fixtures and a clean browser profile. Never attach real cookies, tokens, passwords,
+HAR files, browser profiles, private database files, account screenshots, or real shop/purchase
+history. Redact local machine paths and personal identifiers.
+
+## Security design summary
+
+The extension uses Manifest V3, no remote executable code, top-frame isolated-world content scripts,
+one narrow host permission, no external message interface, strict runtime message schemas and
+sender/page validation, response-size limits, request deadlines, safe DOM creation, storage
+sanitization, explicit consequential-action confirmation, a cross-tab session lock, one-shot
+submission, and exact post-update verification.

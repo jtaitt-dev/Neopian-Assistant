@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible Neopian Assistant defect using sanitized data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include passwords, cookies, session data, account names, private shop history, browser profiles, HAR files, or sensitive security details. Follow SECURITY.md for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      placeholder: 7.8.0
+    validations:
+      required: true
+  - type: input
+    id: chrome
+    attributes:
+      label: Chrome version
+      placeholder: Chrome 126
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - On-page dashboard
+        - Dailies or progress
+        - Auto Pricing dry run
+        - Auto Pricing reviewed update
+        - Popup
+        - Options or data controls
+        - Build, validation, or packaging
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use synthetic names, IDs, and prices. State whether dry-run was enabled.
+      placeholder: |
+        1. Open...
+        2. Choose...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description:
+        Paste generic console text or attach screenshots only after removing account and private
+        data.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label:
+            I removed credentials, account identifiers, cookies, session data, and private
+            price/shop history.
+          required: true
+        - label: I did not perform a real irreversible action solely to reproduce this bug.
+          required: true
