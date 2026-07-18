@@ -6,6 +6,7 @@ import {
   migrateLegacyData,
   migrateStorageRecord,
   sanitizeAppData,
+  storageRecordNeedsWrite,
 } from "../src/shared/storage.js";
 import { LEGACY_STORAGE_KEYS, SCHEMA_VERSION, STORAGE_KEYS } from "../src/shared/constants.js";
 
@@ -42,6 +43,8 @@ test("legacy storage migrates once without enabling real auto pricing", () => {
   assert.equal(migrated.settings.autoPricing.rule, "match");
   assert.equal(migrated.settings.autoPricing.enabled, false);
   assert.equal(migrated.settings.autoPricing.dryRun, true);
+  assert.equal(migrated.settings.autoBuy.enabled, false);
+  assert.equal(migrated.settings.autoBuy.dryRun, true);
   assert.equal(migrated.state[item.id].completed, 1);
   assert.equal(migrated.history[0].itemId, item.id);
   assert.deepEqual(sanitizeAppData(migrated), migrated);
@@ -58,6 +61,28 @@ test("new storage takes precedence over legacy data", () => {
   assert.equal(result.data.settings.theme, "light");
 });
 
+test("schema upgrades and sanitized repairs are persisted idempotently", () => {
+  const current = createDefaultData();
+  assert.equal(storageRecordNeedsWrite({ [STORAGE_KEYS.data]: current }, current, false), false);
+  assert.equal(
+    storageRecordNeedsWrite(
+      { [STORAGE_KEYS.data]: { ...current, schemaVersion: SCHEMA_VERSION - 1 } },
+      current,
+      false,
+    ),
+    true,
+  );
+  assert.equal(
+    storageRecordNeedsWrite(
+      { [STORAGE_KEYS.data]: { ...current, transientUiValue: "remove" } },
+      current,
+      false,
+    ),
+    true,
+  );
+  assert.equal(storageRecordNeedsWrite({}, current, false), true);
+});
+
 test("storage equivalence ignores key order and unknown transient properties", () => {
   const current = createDefaultData();
   const reordered = {
@@ -67,6 +92,7 @@ test("storage equivalence ignores key order and unknown transient properties", (
     settings: {
       theme: current.settings.theme,
       autoPricing: current.settings.autoPricing,
+      autoBuy: current.settings.autoBuy,
       dailiesEnabled: current.settings.dailiesEnabled,
       density: current.settings.density,
       enabled: current.settings.enabled,
@@ -88,6 +114,8 @@ test("corrupt storage recovers to complete defaults", () => {
   assert.ok(result.data.groups.length > 0);
   assert.equal(result.data.settings.autoPricing.enabled, false);
   assert.equal(result.data.settings.autoPricing.dryRun, true);
+  assert.equal(result.data.settings.autoBuy.enabled, false);
+  assert.equal(result.data.settings.autoBuy.dryRun, true);
 });
 
 test("sanitization removes invalid groups, duplicate IDs, and unknown state", () => {

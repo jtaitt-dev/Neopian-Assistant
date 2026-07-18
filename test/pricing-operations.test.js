@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  classifyMutationFailure,
   createPlanFingerprint,
   createShopUpdatePayload,
   createWizardPayload,
@@ -46,6 +47,13 @@ test("pricing plans reject duplicates and per-run limit violations", () => {
   );
   assert.equal(
     validatePricingPlan(
+      { accountContext: "Example_User", rows: [{ ...row, proposedPrice: 0 }] },
+      { maxItems: 1 },
+    ).valid,
+    false,
+  );
+  assert.equal(
+    validatePricingPlan(
       {
         accountContext: "Example_User",
         rows: [row, { ...row, id: "456", objectIdField: "obj_id_2", priceField: "cost_2" }],
@@ -54,6 +62,11 @@ test("pricing plans reject duplicates and per-run limit violations", () => {
     ).valid,
     false,
   );
+});
+
+test("submitted mutations become uncertain instead of ordinary failures", () => {
+  assert.equal(classifyMutationFailure(false), "failed");
+  assert.equal(classifyMutationFailure(true), "uncertain");
 });
 
 test("fixed endpoint payload builders encode names and preserve unselected prices", () => {

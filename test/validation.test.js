@@ -6,25 +6,31 @@ import {
   isAllowedItemIconUrl,
   isAllowedNeopetsPageUrl,
   isOwnShopStockUrl,
+  isShopWizardUrl,
   makeStableItemId,
   parseCooldown,
   parseNeopointValue,
   sanitizeDaily,
   sanitizeSettings,
   sanitizeShopRow,
+  sanitizePurchaseCandidate,
 } from "../src/shared/validation.js";
 
 test("URL validation permits only the audited Neopets HTTPS origins", () => {
   assert.equal(isAllowedNeopetsPageUrl("https://www.neopets.com/market.phtml"), true);
   assert.equal(isAllowedNeopetsPageUrl("http://www.neopets.com/market.phtml"), false);
+  assert.equal(isAllowedNeopetsPageUrl("https://www.neopets.com:444/market.phtml"), false);
   assert.equal(
     isAllowedNeopetsPageUrl("https://evil.example/?next=https://www.neopets.com"),
     false,
   );
   assert.equal(isAllowedItemIconUrl("https://images.neopets.com/items/example.gif"), true);
   assert.equal(isAllowedItemIconUrl("https://www.neopets.com/items/example.gif"), false);
+  assert.equal(isAllowedItemIconUrl("https://images.neopets.com:444/items/example.gif"), false);
   assert.equal(isOwnShopStockUrl("https://www.neopets.com/market.phtml?type=your"), true);
   assert.equal(isOwnShopStockUrl("https://www.neopets.com/market.phtml?type=till"), false);
+  assert.equal(isShopWizardUrl("https://www.neopets.com/shops/wizard.phtml"), true);
+  assert.equal(isShopWizardUrl("https://www.neopets.com/browseshop.phtml"), false);
 });
 
 test("currency parsing rejects malformed, negative, decimal, and excessive prices", () => {
@@ -33,6 +39,8 @@ test("currency parsing rejects malformed, negative, decimal, and excessive price
   assert.equal(parseNeopointValue("-1"), null);
   assert.equal(parseNeopointValue("12.5"), null);
   assert.equal(parseNeopointValue("1,000,000"), null);
+  assert.equal(parseNeopointValue("1,2,3"), null);
+  assert.equal(parseNeopointValue("1 234 NP"), null);
   assert.equal(parseNeopointValue("abc"), null);
 });
 
@@ -41,6 +49,7 @@ test("suggested pricing applies bounded rule, adjustment, and floor behavior", (
   assert.equal(calculateSuggestedPrice(1000, { rule: "match", amount: 50, floor: 0 }), 1000);
   assert.equal(calculateSuggestedPrice(1000, { rule: "overcut", amount: 50, floor: 0 }), 1050);
   assert.equal(calculateSuggestedPrice(5, { rule: "undercut", amount: 20, floor: 3 }), 3);
+  assert.equal(calculateSuggestedPrice(1, { rule: "undercut", amount: 20, floor: 0 }), 1);
   assert.equal(
     calculateSuggestedPrice(999_999, { rule: "overcut", amount: 20, floor: 0 }),
     999_999,
@@ -60,6 +69,7 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
       maxItems: 900,
       requestIntervalMs: 1,
     },
+    autoBuy: { enabled: true, dryRun: false, maximumPrice: 2_000_000 },
   });
   assert.equal(settings.enabled, true);
   assert.equal(settings.autoPricing.enabled, true);
@@ -69,6 +79,9 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
   assert.equal(settings.autoPricing.floor, 999_999);
   assert.equal(settings.autoPricing.maxItems, 25);
   assert.equal(settings.autoPricing.requestIntervalMs, 6000);
+  assert.equal(settings.autoBuy.enabled, true);
+  assert.equal(settings.autoBuy.dryRun, false);
+  assert.equal(settings.autoBuy.maximumPrice, 999_999);
 });
 
 test("daily validation strips control characters and rejects off-origin links", () => {
@@ -109,6 +122,42 @@ test("cooldown parsing and daily state honor count and timer rules", () => {
     getDailyStatus(item, { completed: 1, lastCompleted: now - 7_200_001, dateKey: null }, now)
       .complete,
     false,
+  );
+  assert.equal(parseCooldown("anytime").period, "daily");
+  assert.equal(
+    getDailyStatus(
+      { cooldown: "anytime" },
+      { completed: 1, lastCompleted: Date.UTC(2026, 6, 18, 6), dateKey: "2026-07-17" },
+      Date.UTC(2026, 6, 18, 8),
+    ).complete,
+    false,
+  );
+});
+
+test("purchase candidates bind one positive price to an exact Neopets shop URL", () => {
+  const candidate = sanitizePurchaseCandidate({
+    itemName: "Healing Potion I",
+    owner: "safe_owner",
+    objectId: "123456",
+    price: "25",
+    purchaseUrl:
+      "https://www.neopets.com/browseshop.phtml?owner=safe_owner&buy_obj_info_id=123456&buy_cost_neopoints=25",
+  });
+  assert.equal(candidate.price, 25);
+  assert.equal(sanitizePurchaseCandidate({ ...candidate, price: 0 }), null);
+  assert.equal(
+    sanitizePurchaseCandidate({
+      ...candidate,
+      purchaseUrl: `${candidate.purchaseUrl}&quantity=2`,
+    }),
+    null,
+  );
+  assert.equal(
+    sanitizePurchaseCandidate({
+      ...candidate,
+      purchaseUrl: candidate.purchaseUrl.replace("www.neopets.com", "evil.example"),
+    }),
+    null,
   );
 });
 

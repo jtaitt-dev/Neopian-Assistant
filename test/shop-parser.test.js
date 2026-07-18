@@ -3,9 +3,13 @@ import test from "node:test";
 import { parseHTML } from "linkedom";
 import {
   extractAccountContext,
+  extractPurchaseCandidates,
   extractShopRows,
   parseWizardResponse,
   verifyAppliedPrices,
+  verifyFreshPurchaseCandidate,
+  verifyFreshShopState,
+  verifyPurchaseResponse,
 } from "../src/content/shop-parser.js";
 
 function parser() {
@@ -59,4 +63,95 @@ test("verification reports exact mismatches instead of false success", () => {
   const failed = verifyAppliedPrices(shopHtml, expected, parser());
   assert.equal(failed.verified, false);
   assert.equal(failed.mismatches.length, 1);
+});
+
+test("fresh shop checks reject changed account, row identity, or current price", () => {
+  const plan = {
+    accountContext: "Example_User",
+    rows: [
+      {
+        id: "123",
+        name: "Valid Item",
+        objectIdField: "obj_id_1",
+        priceField: "cost_1",
+        currentPrice: 1000,
+        proposedPrice: 999,
+        include: true,
+      },
+    ],
+  };
+  assert.equal(verifyFreshShopState(shopHtml, plan, parser()).fresh, true);
+  assert.equal(verifyFreshShopState(shopHtml.replace("1,000", "998"), plan, parser()).fresh, false);
+  assert.equal(
+    verifyFreshShopState(shopHtml.replace("Example_User", "Other_User"), plan, parser()).fresh,
+    false,
+  );
+});
+
+const purchaseCandidate = {
+  itemName: "Healing Potion I",
+  owner: "safe_owner",
+  objectId: "123456",
+  price: 25,
+  purchaseUrl:
+    "https://www.neopets.com/browseshop.phtml?owner=safe_owner&buy_obj_info_id=123456&buy_cost_neopoints=25",
+};
+
+const wizardPurchaseHtml = `<!doctype html><html><body>
+  <input id="shopwizard" value="Healing Potion I">
+  <div class="wizard-results-grid-shop"><ul>
+    <li class="wizard-results-grid-header">Shop Owner Stock Price</li>
+    <li><a href="${purchaseCandidate.purchaseUrl}"><span>safe_owner</span><span>1</span><span class="wizard-results-price">25 NP</span></a></li>
+    <li><a href="https://www.neopets.com/browseshop.phtml?owner=other_owner&buy_obj_info_id=654321&buy_cost_neopoints=30"><span>other_owner</span><span>1</span><span class="wizard-results-price">29 NP</span></a></li>
+  </ul></div>
+</body></html>`;
+
+test("Shop Wizard purchase parsing requires visible and URL prices to match", () => {
+  const { document } = parseHTML(wizardPurchaseHtml);
+  const candidates = extractPurchaseCandidates(document);
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0], purchaseCandidate);
+  assert.equal(
+    verifyFreshPurchaseCandidate(wizardPurchaseHtml, purchaseCandidate, parser()).fresh,
+    true,
+  );
+  assert.equal(
+    verifyFreshPurchaseCandidate(
+      wizardPurchaseHtml.replace("buy_cost_neopoints=25", "buy_cost_neopoints=26"),
+      purchaseCandidate,
+      parser(),
+    ).fresh,
+    false,
+  );
+});
+
+test("Shop Wizard purchase parsing falls back to the live results heading after search clears", () => {
+  const resultsOnly = wizardPurchaseHtml
+    .replace('<input id="shopwizard" value="Healing Potion I">', "")
+    .replace(
+      '<div class="wizard-results-grid-shop">',
+      '<div id="shopWizardFormResults"><div class="wizard-results-header"><h3>Healing Potion I</h3></div><div class="wizard-results-grid-shop">',
+    )
+    .replace("</body>", "</div></body>");
+  const { document } = parseHTML(resultsOnly);
+  assert.deepEqual(extractPurchaseCandidates(document)[0], purchaseCandidate);
+});
+
+test("purchase verification requires item identity and unambiguous success language", () => {
+  assert.equal(
+    verifyPurchaseResponse(
+      "<main><h1>Healing Potion I</h1><p>Your purchase has been successful!</p></main>",
+      purchaseCandidate,
+      parser(),
+    ).verified,
+    true,
+  );
+  assert.equal(
+    verifyPurchaseResponse(
+      "<main><h1>Healing Potion I</h1><p>This item has been sold.</p></main>",
+      purchaseCandidate,
+      parser(),
+    ).verified,
+    false,
+  );
 });
