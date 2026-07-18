@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neopian Assistant Settings</title>
+    <link rel="stylesheet" href="../ui/common.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header class="options-header">
+      <div class="ui-brand">
+        <img src="../icons/icon64.png" width="52" height="52" alt="" />
+        <div>
+          <h1>Neopian Assistant</h1>
+          <p>Your all-in-one companion for smarter Neopets routines.</p>
+        </div>
+      </div>
+      <div class="options-header__save">
+        <button id="save" class="ui-button ui-button--primary" type="button">Save changes</button>
+        <div id="status" class="ui-status" role="status" aria-live="polite"></div>
+      </div>
+    </header>
+
+    <div class="options-layout">
+      <nav class="options-nav" aria-label="Settings sections">
+        <a href="#general">General</a>
+        <a href="#dailies">Dailies</a>
+        <a href="#auto-pricing">Auto Pricing</a>
+        <a href="#privacy">Privacy &amp; Data</a>
+        <a href="#about">About</a>
+      </nav>
+
+      <main id="settings" aria-busy="true">
+        <section id="general" class="options-section" aria-labelledby="general-title">
+          <div class="options-section__heading">
+            <h2 id="general-title">General</h2>
+            <p>Control when and how the on-page dashboard appears.</p>
+          </div>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <label for="enabled">Global enabled</label>
+                <p>Turn Neopian Assistant on or off on all supported Neopets pages.</p>
+              </div>
+              <label class="ui-switch" aria-label="Enable Neopian Assistant">
+                <input id="enabled" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <label for="theme">Theme</label>
+                <p>Choose a light, dark, or system-matched dashboard.</p>
+              </div>
+              <select id="theme">
+                <option value="system">Use system setting</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div>
+                <label for="density">Panel density</label>
+                <p>Adjust the spacing of dashboard rows and controls.</p>
+              </div>
+              <select id="density">
+                <option value="comfortable">Comfortable</option>
+                <option value="compact">Compact</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section id="dailies" class="options-section" aria-labelledby="dailies-title">
+          <div class="options-section__heading">
+            <h2 id="dailies-title">Dailies</h2>
+            <p>Navigation and completion tracking remain user initiated.</p>
+          </div>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <label for="dailies-enabled">Enable dailies tracking</label>
+                <p>
+                  Show daily navigation, explicit completion controls, progress, and local history.
+                </p>
+              </div>
+              <label class="ui-switch" aria-label="Enable dailies tracking">
+                <input id="dailies-enabled" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+          </div>
+          <div class="options-notice">
+            <p>
+              Opening a daily never marks it complete. Use the separate completion control only
+              after you confirm the action on Neopets.
+            </p>
+          </div>
+        </section>
+
+        <section id="auto-pricing" class="options-section" aria-labelledby="pricing-title">
+          <div class="options-section__heading">
+            <h2 id="pricing-title">Auto Pricing</h2>
+            <p>
+              Project-approved automated shop price lookup and application with mandatory review.
+            </p>
+          </div>
+          <div class="options-notice options-notice--warning">
+            <strong>Explicit opt-in and project-specific approval</strong>
+            <p>
+              Auto Pricing is off by default. The repository owner states that this project has
+              approval to use this feature and the official daily item icons. That statement is not
+              a general authorization for other users or deployments.
+            </p>
+          </div>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <label for="pricing-enabled">Enable Auto Pricing</label>
+                <p>
+                  Permit price scans and reviewed shop price updates on your own shop stock page.
+                </p>
+              </div>
+              <label class="ui-switch" aria-label="Enable Auto Pricing">
+                <input id="pricing-enabled" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <label for="dry-run">Dry run</label>
+                <p>Scan, calculate, and review without submitting any price changes.</p>
+              </div>
+              <label class="ui-switch" aria-label="Use dry-run mode">
+                <input id="dry-run" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+            <div class="setting-fields">
+              <label>
+                Pricing rule
+                <select id="pricing-rule">
+                  <option value="undercut">Undercut lowest</option>
+                  <option value="match">Match lowest</option>
+                  <option value="overcut">Price above lowest</option>
+                </select>
+              </label>
+              <label>
+                Adjustment (NP)
+                <input id="pricing-amount" type="number" min="0" max="999999" step="1" />
+              </label>
+              <label>
+                Floor price (NP)
+                <input id="pricing-floor" type="number" min="0" max="999999" step="1" />
+              </label>
+              <label>
+                Maximum changed items per run
+                <input id="pricing-max-items" type="number" min="1" max="25" step="1" />
+              </label>
+              <label>
+                Seconds between Shop Wizard requests
+                <input id="pricing-interval" type="number" min="6" max="60" step="1" />
+              </label>
+            </div>
+          </div>
+          <div class="options-notice options-notice--safe">
+            <strong>Verified once, never blindly retried</strong>
+            <p>
+              Each run is rate limited. Real updates require an exact-plan confirmation token and a
+              cross-tab lock. The extension submits once, fetches the shop again, and reports
+              success only after every selected price matches.
+            </p>
+          </div>
+        </section>
+
+        <section id="privacy" class="options-section" aria-labelledby="privacy-title">
+          <div class="options-section__heading">
+            <h2 id="privacy-title">Privacy &amp; Data</h2>
+            <p>Understand, export, import, or remove the data stored by the extension.</p>
+          </div>
+          <div class="privacy-grid">
+            <article>
+              <h3>Stored locally</h3>
+              <p>
+                Settings, custom routines, completion history, and redacted operation status are
+                stored in Chrome extension storage on this device.
+              </p>
+            </article>
+            <article>
+              <h3>Transmitted only to Neopets</h3>
+              <p>
+                When Auto Pricing runs, validated item names and price updates are sent only to
+                fixed HTTPS endpoints on www.neopets.com using your existing signed-in browser
+                session.
+              </p>
+            </article>
+            <article>
+              <h3>No telemetry</h3>
+              <p>
+                No analytics, advertising, developer server, tracking SDK, or remote executable code
+                is included.
+              </p>
+            </article>
+          </div>
+          <div class="data-actions">
+            <button id="export" class="ui-button ui-button--secondary" type="button">
+              Export data
+            </button>
+            <label class="ui-button ui-button--secondary" for="import">Import data</label>
+            <input id="import" type="file" accept="application/json,.json" />
+            <button id="clear" class="ui-button ui-button--danger" type="button">
+              Clear extension data
+            </button>
+          </div>
+          <div id="operation-history" class="operation-history" aria-live="polite"></div>
+        </section>
+
+        <section id="about" class="options-section" aria-labelledby="about-title">
+          <div class="options-section__heading">
+            <h2 id="about-title">About</h2>
+            <p>Product identity, disclaimer, and license status.</p>
+          </div>
+          <div class="about-box">
+            <img src="../icons/icon96.png" width="72" height="72" alt="" />
+            <div>
+              <h3>Neopian Assistant</h3>
+              <p>Your all-in-one companion for smarter Neopets routines.</p>
+              <p>
+                Neopian Assistant is an unofficial fan-made extension and is not affiliated with,
+                endorsed by, or sponsored by Neopets.
+              </p>
+              <p>
+                No software license has been selected. All rights are reserved unless the repository
+                owner adds a license.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="confirm-dialog" class="options-dialog">
+      <form method="dialog">
+        <h2 id="confirm-title">Confirm action</h2>
+        <p id="confirm-message"></p>
+        <div>
+          <button class="ui-button ui-button--secondary" type="submit" value="cancel">
+            Cancel
+          </button>
+          <button
+            id="confirm-action"
+            class="ui-button ui-button--danger"
+            type="submit"
+            value="confirm"
+          >
+            Confirm
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
