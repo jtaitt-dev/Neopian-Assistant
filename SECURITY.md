@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest version on the `main` branch. The currently supported
-extension release is 7.8.x.
+extension release is 7.9.x.
 
 ## Reporting a vulnerability
 
@@ -34,6 +34,8 @@ In scope:
 - Manifest permissions and content-script isolation.
 - Service-worker message validation and fixed network destinations.
 - Auto Pricing validation, confirmation, locking, idempotency, and verification.
+- Auto Buy item/price/URL validation, fresh-listing binding, duplicate prevention, locking, and
+  response verification.
 - Storage validation and migration.
 - Import/export behavior and unsafe DOM rendering.
 - Build, packaging, dependency, and secret-exposure risks.
@@ -56,5 +58,18 @@ history. Redact local machine paths and personal identifiers.
 The extension uses Manifest V3, no remote executable code, top-frame isolated-world content scripts,
 one narrow host permission, no external message interface, strict runtime message schemas and
 sender/page validation, response-size limits, request deadlines, safe DOM creation, storage
-sanitization, explicit consequential-action confirmation, a cross-tab session lock, one-shot
-submission, and exact post-update verification.
+sanitization, fresh-state checks, explicit consequential-action confirmation, cross-tab session
+locks, hashed duplicate-purchase protection, one-shot submission, no blind retry, uncertain-result
+classification, and exact post-update verification.
+
+## Consequential-action invariants
+
+- Auto Pricing can mutate only the signed-in user's own shop-stock page, and Auto Buy can act only
+  from a Shop Wizard page.
+- Content messages must originate from this extension in an integer tab whose URL matches the exact
+  feature page.
+- Feature enablement, dry-run state, item/account identity, price limits, operation ID, current
+  state, confirmation expiry, fingerprint, and lock ownership are revalidated in the service worker.
+- A mutation is issued at most once. Any error after submission is `uncertain`, not a retry signal.
+- Price success requires exact fresh shop values; purchase success requires expected item identity
+  and unambiguous Neopets success text.

@@ -10,6 +10,8 @@ Thank you for helping improve Neopian Assistant.
   project.
 - Do not remove Auto Pricing solely because it is policy-sensitive. Keep it explicit, opt-in,
   conservative, reviewable, cancellable, and verifiable.
+- Keep Auto Buy disabled by default, dry-run by default, quantity one, bounded by a hard maximum,
+  fresh-state checked, duplicate-blocked, cross-tab locked, one-shot, and verified.
 - Do not add CAPTCHA bypass, anti-bot evasion, stealth behavior, proxy rotation, credential access,
   cookie extraction, hidden automation, or blind retries of consequential actions.
 - Never commit real account data, credentials, browser profiles, logs, HAR files, screenshots with
@@ -34,8 +36,9 @@ esbuild, Biome, Prettier, and Node's built-in test runner.
    consequential-operation changes.
 4. Run `npm run verify` and `npm audit --audit-level=high`.
 5. Build with `npm run build` and load `dist/` in a clean Chrome profile.
-6. Use fixture pages and dry-run mode. Do not log into a real account or submit real price changes
-   during automated tests.
+6. Use fixture pages and dry-run mode for automated tests. Live tests require explicit account
+   authorization, the minimum low-risk action, before/after state, redacted evidence, and restored
+   temporary settings.
 7. Run `npm run package` only after verification passes.
 8. Review staged filenames, staged diff, and secret-scan output before committing.
 
@@ -75,6 +78,8 @@ npm run validate:branch -- feature/add-shop-filter
 - Consequential operations must require explicit user initiation, feature enablement,
   current-page/account/state validation, bounded inputs, duplicate prevention, an operation ID, no
   blind retry, and verified success.
+- Treat any failure after a request may have been submitted as `uncertain`; require manual state
+  inspection and never turn ambiguity into an automatic retry.
 - Respect keyboard access, visible focus, semantic controls, responsive layouts, and reduced-motion
   preferences.
 

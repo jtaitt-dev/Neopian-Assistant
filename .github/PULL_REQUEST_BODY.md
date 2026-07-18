@@ -1,188 +1,129 @@
 ## Summary
 
 This PR completes the production audit, repair, Manifest V3 hardening, Neopian Assistant rebrand,
-test foundation, documentation pass, and release pipeline for extension version 7.8.0.
-
-Neopian Assistant remains a vanilla JavaScript Chrome extension. Approved Auto Pricing and official
-daily item icons remain available, with the approval boundary disclosed as project-specific. Auto
-Pricing is now off by default, dry-run by default, conservatively paced, explicitly reviewed, locked
-across tabs, submitted once, and verified before success.
+guarded shop workflows, test foundation, documentation, and release pipeline through extension
+version 7.9.0.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-## Architecture changes
+The existing approved Auto Pricing feature remains available with its match/undercut/overcut rules.
+It now requires fresh authenticated shop state immediately before a one-shot update. The PR also
+adds a separate disabled-by-default, dry-run-by-default Auto Buy review for one exact Shop Wizard
+listing with a hard maximum, quantity one, stale-listing checks, cross-tab locking, hashed duplicate
+prevention, no retry, and strict response verification.
 
-- Replaced the five-file/930-line monolith with modular source under `src/` and a generated `dist/`
-  production build.
-- Added a fixed-endpoint Manifest V3 module service worker, bundled isolated-world content script,
-  popup, full options page, shared validation/storage/network modules, build tooling, packaging,
-  tests, and CI.
-- Removed the arbitrary fetch proxy, unsafe HTML rendering, broad host matching, web-accessible
-  application module, and legacy root build files.
+## User-visible changes
 
-## Features reviewed
+- Four dashboard sections: Dailies, Progress, Auto Pricing, and Auto Buy.
+- Auto Pricing selected-price minimum of 1 NP and strict thousands-separator parsing.
+- Fresh stock comparison before price submission and `uncertain` status for ambiguous submitted
+  outcomes.
+- One-item Auto Buy settings, review dialog, dry run, maximum-price control, redacted history, and
+  clear failure guidance.
+- Manual/anytime completion marks reset at the Neopian day boundary.
+- Enabling the extension after disabled startup mounts it without a page reload.
+- Synchronized 7.9.0 version, schema 3 migration, rebuilt release package, and complete current
+  documentation.
 
-- Daily navigation, explicit completion/reset, cooldown state, progress/history, groups, search, and
-  editing.
-- Popup, options, themes, density, import/export, clear-data controls, and storage migration.
-- Shop page/account/item parsing, Shop Wizard lookup, price calculation, Auto Pricing
-  scan/cancel/review/apply/verify, operation status, and multi-tab behavior.
-- Manifest permissions, service-worker lifecycle, content injection, icons, privacy, accessibility,
-  performance, packaging, and release documentation.
+## Consequential-action protections
 
-## Critical defects fixed
+- Exact feature enablement, sender extension ID, integer tab, and own-stock/Wizard page checks.
+- Strict item, account, row, field, URL, quantity, price, maximum, and message schemas.
+- Fixed HTTPS Neopets endpoints and 2 MB response caps.
+- Conservative global lookup spacing, deadlines, price-scan cancellation, and bounded state.
+- Fresh server response plus SHA-256 plan/response/candidate binding.
+- Short-lived confirmations, operation UUIDs, and service-worker-session cross-tab locks.
+- Hashed 24-hour duplicate blocking for running, pending, verified, or uncertain purchases.
+- One mutation request, no blind retry, and explicit `uncertain` classification after ambiguous
+  submission.
+- Exact post-price verification and strict expected-item/success-text purchase verification.
+- Redacted local operation history with no account, owner, item, price, URL, response, cookie, or
+  credential logging.
 
-- Removed an arbitrary authenticated background fetch proxy accepting caller-controlled URL, method,
-  headers, and body. Runtime networking is now limited to audited `www.neopets.com` endpoints with
-  strict message/sender/page validation, timeouts, abort handling, and response bounds.
+## Security and privacy
 
-## High-severity defects fixed
+- Permissions remain `storage` plus `https://www.neopets.com/*`; no optional permissions.
+- No cookies/history/password APIs, alarms, notifications, external messaging, web-accessible
+  resources, page-world injection, inline scripts/handlers, unsafe HTML APIs, `eval`, remote code,
+  telemetry, ads, or developer backend.
+- Exact origin validation rejects alternate schemes, subdomains, and ports.
+- Existing schema data now persists its canonical schema 3 migration once; corrupt/excessive values
+  recover to safe defaults.
+- Original editable extension logo and generated 16/19/24/32/38/48/64/96/128 PNGs are retained.
+  Official daily item icons remain under the owner's project-specific approval.
 
-- Added exact-plan fingerprinting, operation IDs, confirmation tokens, cross-tab locking, current
-  page/account/item/field/price validation, one-shot submission, and exact post-update verification.
-- Replaced unsafe `innerHTML` rendering and permissive trust-boundary coercion with safe DOM
-  creation and bounded validation.
-- Narrowed host access to `https://www.neopets.com/*` and removed web-accessible resources/external
-  messaging.
-- Separated daily navigation from explicit manual completion so navigation cannot report false
-  success.
+## Reliability, performance, UX, and accessibility
 
-## Medium-severity defects fixed
+- Idempotent content initialization, disabled-state reactivation, deterministic teardown, serialized
+  writes, and storage-backed operation state.
+- Bounded routines, rows, prices, histories, cancellations, responses, imports, tokens, and locks.
+- One cleared 30-second status tick, event-driven updates, sequential lookups, and resize debounce.
+- Semantic controls, tables, dialogs, status regions, progress, cancellation, visible focus,
+  keyboard operation, responsive surfaces, themes, and reduced-motion support.
+- Dry-run tests prove neither controller sends a mutation message.
 
-- Added idempotent initialization/teardown, bounded state, cleared timers/observers/listeners,
-  serialized storage writes, stable shared data identity, and normalized storage equivalence.
-- Added request spacing, timeouts, cancellation, HTTP/empty/malformed/wait-state handling, import
-  limits, schema migration, and corrupt-storage recovery.
-- Fixed duplicate dailies rendering and CSS that incorrectly exposed inactive Auto Pricing controls.
-- Added reproducible build, lockfile, formatting, linting, tests, validation, secret scan, CI, and
-  release archive generation.
-- Standardized development branches under enforced feature/fix/hotfix/refactor/docs/test/chore
-  prefixes with lowercase kebab-case descriptions.
+## Validation
 
-## Security improvements
-
-- One narrow host permission and one `storage` permission; no optional permissions.
-- No remote executable code, inline script/handlers, `eval`, unsafe HTML APIs, external connection,
-  or web-accessible resource.
-- Strict runtime message schemas and sender extension/tab/exact-page checks.
-- Fixed destinations/headers, 2 MB responses, 15/20-second deadlines, cancellation, bounded run
-  data, SHA-256 plan binding, short-lived tokens, cross-tab locks, and redacted operation history.
-- Repository and staged-content secret scanning excludes/transparently rejects credentials, private
-  paths, profiles, cookies, sessions, logs, databases, and HAR files.
-
-## Reliability and performance improvements
-
-- Reduced the baseline one-second perpetual timer to a cleared 30-second status tick plus
-  event-driven updates.
-- Added service-worker-persistent session/local operation state rather than relying on globals as
-  authority.
-- Bounded groups, routines, history, operations, shop rows, response bytes, imports, cancellation
-  IDs, prices, and per-run updates.
-- Sequential conservative lookups, no blind update retry, exact verification, and accurate
-  failure/success messages.
-
-## Code-quality improvements
-
-- Preserved vanilla JavaScript while introducing focused modules, centralized constants/schemas, a
-  deterministic esbuild/Sharp build, Prettier, Biome, Node tests, static validation, and release
-  packaging.
-- Removed stale experiments, unsafe proxy code, old naming, and obsolete production files.
-
-## UX and accessibility improvements
-
-- Added complete loading/running/success/warning/failure/disabled states, progress, cancellation,
-  empty states, and consequential-action confirmation.
-- Added responsive popup/options/dashboard surfaces, semantic tabs/forms/dialogs/tables/buttons,
-  labels and accessible names, visible focus, polite status regions, keyboard navigation,
-  contrast-aware themes, and reduced-motion support.
-- Popup/options explain permissions, local data, policy-sensitive behavior, project-specific
-  approval, and exact license status.
-
-## Privacy improvements
-
-- No analytics, telemetry, ads, developer backend, cookie access, or sensitive production logging.
-- Local storage is schema-validated and documented; pricing transmits only validated item
-  names/reviewed form data to fixed Neopets HTTPS endpoints.
-- Added accurate export/import/delete controls and `PRIVACY.md` covering data read, stored,
-  transmitted, retained, cleared, and logged.
-
-## Branding changes
-
-- Rebranded all product surfaces and package/release metadata as **Neopian Assistant**.
-- Added the exact tagline and unofficial-extension disclaimer.
-- Added an original compass-spark extension logo and complete generated icon set.
-- Retained approved official daily item images from the restricted `images.neopets.com/items/`
-  origin; no official Neopets logo is used.
-
-## Manifest and permission changes
-
-- Version: 7.7.9 → 7.8.0 (substantial backward-compatible hardening and rebrand).
-- Manifest V3 retained; minimum Chrome version set to 114.
-- Host scope changed from broad schemes/subdomains to `https://www.neopets.com/*`.
-- Added popup/options, strict extension CSP, complete icon references, `incognito: not_allowed`, and
-  top-frame `document_idle` content execution.
-- Removed web-accessible resources; no external connection or optional permissions exist.
-
-## Tests executed
-
-- `npm ci` — passed; 31 packages installed from the lockfile.
 - `npm audit --audit-level=high` — passed; 0 vulnerabilities.
+- All source JavaScript `node --check` — passed.
 - `npm run format:check` — passed.
-- `npm run lint` — passed; 61 files, no fixes or warnings.
-- `npm test` — passed; 31 tests, 31 passed, 0 failed, 0 skipped.
-- `npm run validate:branch -- feature/neopian-assistant-audit-rebrand` — passed.
-- `npm run test:coverage` — passed; 55.43% aggregate line coverage, with UI behavior additionally
-  exercised in the real-browser smoke suite.
+- `npm run lint` — passed.
+- `npm test` — passed; 45 passed, 0 failed, 0 skipped.
+- `npm run test:coverage` — passed; 65.33% lines, 78.39% branches, 74.03% functions.
 - `npm run build` — passed; production output in `dist/`.
-- `npm run validate` — passed; Manifest V3, 11 references, icons/alpha, CSP-safe HTML,
-  branding/version, and production API constraints.
+- `npm run validate` — passed; Manifest V3, 11 references, icons/alpha, CSP-safe HTML, branding,
+  synchronized version, and production API constraints.
 - `npm run secret-scan` — passed; no credential-shaped values, sensitive filenames, or private local
   paths.
-- `npm run package` — passed; 21-file release archive.
+- `npm run package` — passed; 21-file `release/neopian-assistant-7.9.0.zip`.
+- `npm run validate:branch -- feature/neopian-assistant-audit-rebrand` — passed.
 
-## Smoke-test results
+Added coverage for strict price parsing, zero protection, fresh shop state, partial-result status,
+purchase limits/item/URL/visible-price validation, duplicate history, locks, strict response
+verification, dry-run non-mutation, sender/page binding, disabled-startup reactivation, daily
+timezone reset, schema write-back, and live-results heading fallback.
 
-Chrome for Testing 151 loaded `dist/` in a disposable profile with no real credentials. Verified:
+## Browser and live-account validation
 
-- Extension install/manifest parsing, module service worker registration and full browser restart.
-- Popup, options, dashboard, exact branding/disclaimer, and 31/31 approved official item icons.
-- One-shell idempotency after reload, two matched tabs, and zero injection on an unmatched origin.
-- Settings and Auto Pricing opt-in persistence across content/service-worker contexts and browser
-  restart.
-- Mocked two-item dry-run pricing, conservative spacing, results, confirmation checkbox,
-  account/item/range/UUID operation summary, and explicit “No prices were submitted” completion.
-- Mocked HTTP 503 failure with two error rows and no review action.
-- Offline popup startup, keyboard focus visibility, and zero final console errors/warnings.
+Prior sanitized clean-profile evidence verifies installation, service worker, popup, options,
+dashboard, icons, intended/unintended origins, reload/idempotency, multiple tabs, settings
+persistence, Auto Pricing dry run, HTTP failure, offline popup, keyboard focus, and clean console.
 
-No real purchase, offer, inventory action, credential, or shop price update was used.
+Authenticated read-only 7.9.0 validation confirmed:
 
-## Manual validation and screenshots
+- Live own-shop indexed form fields and fixed process endpoint.
+- Live Wizard purchase URL path and exact three query parameters.
+- Matching visible/URL price and a normalized common low-value candidate below the default ceiling.
+- A real markup difference where results clear the input and preserve item identity in the results
+  heading; implementation and test were repaired.
 
-- [Dailies dashboard](docs/evidence/dashboard-smoke.png)
-- [Auto Pricing dry run](docs/evidence/auto-pricing-smoke.png)
-- [Popup](docs/evidence/popup-smoke.png)
-- [Options](docs/evidence/options-smoke.png)
-- [Full test evidence](docs/TEST_EVIDENCE.md)
-- [Production audit](AUDIT_REPORT.md)
+No account identity, balance, shop name, owner, object ID, cookie, token, header, profile, or raw
+HTML was saved. No shop form or purchase URL was submitted.
+
+Current 7.9.0 installed-build validation is waiting on a manual `chrome://extensions/` reload of
+`dist/`; browser automation is correctly blocked from that privileged page and no bypass was used.
+
+## Documentation and policy
+
+- Rebuilt README with feature modes, architecture, commands, installation, popup/options/dailies/
+  pricing/buying guides, dry run, safeguards, permissions, privacy, clearing, troubleshooting,
+  service-worker inspection, branches, contributions, PRs, releases, versioning, reporting,
+  limitations, policy risk, and license status.
+- Updated changelog, privacy, security, audit, contributing, store listing, test evidence, and PR
+  template to match source.
+- Auto Pricing and official-icon approval remains explicitly project-specific. Auto Buy is disclosed
+  as policy-sensitive and must not be enabled without applicable authorization.
 
 ## Remaining limitations
 
-- Live Neopets markup can change; parsers safely abort but require maintenance when selectors
-  change.
-- Automated tests intentionally did not execute a real shop update. The owner should perform one
-  authorized, manually reviewed, one-item validation and retain sanitized evidence.
-- Chrome Web Store submission itself is outside this PR; `STORE_LISTING.md` is a reviewed draft.
-- GitHub private vulnerability reporting is currently disabled and should be enabled in repository
-  settings.
-- The owner's project-specific approvals are stated but not independently published; downstream
-  users must not treat them as general authorization.
+- Live Neopets markup can change; parsers fail closed and require maintained fixtures/selectors.
+- Unknown purchase-success wording produces `uncertain` rather than a false success.
+- Network ambiguity after submission cannot be eliminated; the extension blocks retry and requires
+  manual state inspection.
+- Chrome Web Store review and GitHub private-vulnerability-reporting enablement are outside this
+  branch.
+- No license has been added; the package remains `UNLICENSED`.
 
-## Policy risks
-
-Chrome Web Store risks are mitigated through Manifest V3, no remote code, minimized permissions, one
-documented purpose, and accurate user-data disclosure. Neopets' published terms broadly restrict
-automation. The owner states this project has specific approval for Auto Pricing and official item
-icons; the implementation keeps that approval boundary visible, requires opt-in and dry-run by
-default, uses conservative pacing, and contains no CAPTCHA bypass, stealth, detection evasion, proxy
-rotation, or blind retry.
+See [AUDIT_REPORT.md](../AUDIT_REPORT.md) and [docs/TEST_EVIDENCE.md](../docs/TEST_EVIDENCE.md) for
+detailed evidence.

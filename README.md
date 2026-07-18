@@ -4,176 +4,393 @@
 
 _Your all-in-one companion for smarter Neopets routines._
 
-Neopian Assistant is an unofficial, fan-made Chrome productivity extension for Neopets. It combines
-explicit daily navigation and completion tracking with project-approved, opt-in shop price lookup
-and reviewed price updates.
+Neopian Assistant is a Manifest V3 Chrome extension for organizing Neopets routines, comparing shop
+prices, reviewing price changes, and handling a tightly limited one-item purchase workflow. The
+dashboard is built with vanilla JavaScript, HTML, and CSS and runs only on the audited
+`https://www.neopets.com/*` origin.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-## Features
+Current extension version: **7.9.0**
 
-- A movable, resizable on-page dashboard with light, dark, system, compact, and comfortable display
-  settings.
-- User-initiated daily navigation, separate manual completion controls, cooldown-aware status,
-  progress, search, groups, and local history.
-- Editable custom routines restricted to HTTPS pages on `www.neopets.com`.
-- Auto Pricing on the signed-in user's own shop stock page, with strict item/price/account
-  validation, conservative request spacing, progress, cancellation, dry-run review, an exact-plan
-  confirmation token, cross-tab locking, one-time submission, and post-update verification.
-- A popup for global status and fast access, plus a complete options page for settings, privacy
-  information, import/export, and data deletion.
-- No analytics, telemetry, advertising, remotely hosted executable code, or developer-operated
-  backend.
+Manifest version: **3**
 
-The production extension is Manifest V3 and supports Chrome 114 or later.
+Minimum Chrome version: **114**
 
-## Requirements
+## What the extension does
 
-- Node.js 20 or later
-- npm 10 or a compatible npm release
-- Google Chrome 114 or later for extension use
+| Mode       | Feature                      | What happens                                                                                   | Can change account state?              |
+| ---------- | ---------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Navigation | Dailies **Go** links         | Opens the selected official Neopets page.                                                      | No                                     |
+| Tracking   | Manual completion            | Stores a local completion mark only after the user presses the separate completion control.    | Extension data only                    |
+| Assistance | Shop Wizard price scan       | Reads validated prices at a conservative interval and prepares suggestions.                    | No                                     |
+| Automation | Reviewed Auto Pricing update | Sends one exact shop-price form after fresh-state validation and explicit confirmation.        | Yes—changes shop prices                |
+| Assistance | Auto Buy dry run             | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
+| Automation | Reviewed one-item Auto Buy   | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
 
-## Local development
+No daily is automatically marked complete. There is no bidding, offering, trading, donating,
+discarding, inventory transfer, CAPTCHA handling, stealth behavior, proxy rotation, credential
+access, telemetry, or developer-operated backend.
 
-```powershell
-npm ci
-npm run dev
+## Feature guide
+
+### Dashboard
+
+The movable and resizable on-page dashboard provides:
+
+- Light, dark, or system theme.
+- Comfortable or compact density.
+- Dailies, Progress, Auto Pricing, and Auto Buy tabs.
+- Searchable and editable daily groups.
+- Polite status announcements, keyboard-operable controls, visible focus, and reduced-motion
+  support.
+- Idempotent initialization and deterministic teardown on page exit.
+
+### Popup
+
+The toolbar popup shows global enablement, the current page type, whether Auto Pricing or Auto Buy
+is available there, a dashboard focus action, settings access, the privacy summary, and the exact
+unofficial disclaimer.
+
+### Settings
+
+The options page controls global appearance, dailies, Auto Pricing, Auto Buy, dry-run modes, pricing
+limits, local export/import, deletion, and redacted operation history. Imports are schema-validated,
+capped at 1 MB, and require confirmation before replacing data.
+
+### Dailies
+
+- Official daily pages are opened only when the user selects **Go**.
+- Completion is a separate manual action; navigation never implies success.
+- Daily and manual-tracking marks reset on the Neopian day boundary using `America/Los_Angeles`
+  time.
+- Count-based, monthly, and elapsed-time cooldowns are handled independently.
+- Groups, routines, notes, cooldowns, and approved `www.neopets.com` URLs can be edited locally.
+- Official item images from `images.neopets.com` are used under the repository owner's stated
+  project-specific approval. The extension logo is original artwork.
+
+### Auto Pricing
+
+Auto Pricing remains available and is hardened around its approved pricing rules.
+
+1. Enable Auto Pricing; dry run remains on by default.
+2. Open `https://www.neopets.com/market.phtml?type=your`.
+3. Start a price scan. The service worker queries the fixed Shop Wizard endpoint sequentially with a
+   6–60 second configured interval.
+4. Review each current, lowest, and suggested price.
+5. For a real update, disable dry run and explicitly authorize the exact plan.
+6. Immediately before submission, the extension fetches fresh shop stock and requires account, row
+   count, item ID, name, field name, and current price to match the reviewed plan.
+7. A short-lived fingerprint-bound confirmation and cross-tab lock permit one POST. There is no
+   automatic retry.
+8. The extension fetches shop stock again and reports success only if every selected price exactly
+   matches.
+
+Prices must be integers from 1 through 999,999 NP for selected updates. Correct comma separators are
+accepted; malformed grouping, internal whitespace, negatives, decimals, empty values, and zero sale
+prices are rejected. If a submitted request cannot be verified, its status is `uncertain` and the
+user is told to reload and inspect stock before any manual retry.
+
+### Auto Buy
+
+Auto Buy is a guarded one-item workflow, not a bulk buyer.
+
+1. It is off by default and dry-run is on by default.
+2. Search for an exact item on the official Shop Wizard page.
+3. Set a maximum purchase price; the default is 1,000 NP.
+4. The dashboard chooses the lowest result only when the item name, owner, object ID, visible price,
+   URL price, origin, path, and three allowed query parameters are all valid.
+5. Review quantity one, the exact item, listing price, and configured ceiling.
+6. For a real purchase, the extension reruns the exact Shop Wizard search and requires the same
+   listing to remain present.
+7. A short-lived confirmation, one-way listing fingerprint, and cross-tab lock authorize one GET to
+   the exact purchase URL. There is no retry.
+8. Success requires the expected item identity and an unambiguous Neopets success response.
+
+Running, pending-verification, verified, or uncertain fingerprints remain in a bounded local history
+for 24 hours to prevent a duplicate request. An uncertain result must be checked manually in
+inventory and is never treated as permission to retry.
+
+### Dry-run behavior
+
+Dry run is the safe starting point for both consequential features:
+
+- Auto Pricing performs lookups and shows the exact review without posting prices.
+- Auto Buy validates and reviews a listing without following its purchase URL.
+- Dry-run completion messages explicitly state that no mutation was submitted.
+
+## Safety protections
+
+- Feature enabled checks in both the content script and service worker.
+- Exact sender extension ID, tab ID, and feature-page validation.
+- Strict message schemas and bounded strings, IDs, prices, rows, responses, and history.
+- Fixed HTTPS Neopets endpoints; no caller-controlled proxy.
+- One operation ID per consequential action.
+- Fresh-state comparison immediately before price updates and purchases.
+- Short-lived SHA-256-bound reviews and confirmations.
+- Session-backed cross-tab locks that survive service-worker suspension.
+- Persistent hashed duplicate-purchase protection.
+- Request deadlines, cancellation for price scans, conservative lookup spacing, and response-size
+  caps.
+- No automatic retry for price changes or purchases.
+- `uncertain` status after any ambiguous submitted mutation.
+- Exact post-price verification and strict purchase-response verification.
+- Safe DOM construction with no `innerHTML`, inline scripts, inline handlers, `eval`, or remote
+  executable code.
+
+## Screenshots
+
+The checked-in images use synthetic fixture data and contain no account identity, balances, cookies,
+or session data.
+
+![Dailies dashboard](docs/evidence/dashboard-smoke.png)
+
+![Auto Pricing dry-run review](docs/evidence/auto-pricing-smoke.png)
+
+![Settings page](docs/evidence/options-smoke.png)
+
+![Toolbar popup](docs/evidence/popup-smoke.png)
+
+## Install from a release package
+
+1. Obtain `neopian-assistant-7.9.0.zip` from the release artifacts.
+2. Extract the archive to a permanent local folder.
+3. Open `chrome://extensions/` in Chrome.
+4. Enable **Developer mode**.
+5. Select **Load unpacked** and choose the extracted folder containing `manifest.json`.
+
+The ZIP is an unpacked-extension package, not a signed Chrome Web Store `.crx`.
+
+## Load the development build
+
+1. Install Node.js 20 or later and npm.
+2. Clone the repository and install the exact lockfile dependencies:
+
+   ```powershell
+   npm ci
+   ```
+
+3. Build the production directory:
+
+   ```powershell
+   npm run build
+   ```
+
+4. Open `chrome://extensions/`, enable **Developer mode**, select **Load unpacked**, and choose
+   `dist/`. Do not load `src/` directly.
+
+After source changes, rebuild, select the extension's **Reload** button on `chrome://extensions/`,
+then reload the Neopets tab. Service-worker changes do not reliably refresh until the extension is
+reloaded.
+
+## Development commands
+
+| Command                   | Purpose                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `npm ci`                  | Install the committed dependency graph.                                      |
+| `npm run dev`             | Watch source files and rebuild `dist/`.                                      |
+| `npm run format`          | Apply Prettier formatting.                                                   |
+| `npm run format:check`    | Verify formatting without writing.                                           |
+| `npm run lint`            | Run Biome lint rules.                                                        |
+| `npm test`                | Run Node unit and integration tests.                                         |
+| `npm run test:coverage`   | Run tests with Node's experimental coverage report.                          |
+| `npm run build`           | Create the production unpacked extension in `dist/`.                         |
+| `npm run validate`        | Validate Manifest V3, references, icons, CSP-safe HTML, and production APIs. |
+| `npm run secret-scan`     | Search the repository for credential-shaped and machine-local data.          |
+| `npm run verify`          | Run formatting, lint, tests, build, validation, and secret scanning.         |
+| `npm run package`         | Create the deterministic release ZIP in `release/`.                          |
+| `npm run validate:branch` | Enforce the approved branch naming policy.                                   |
+
+The source is plain JavaScript, so there is no separate TypeScript compiler command. Syntax, module,
+lint, test, bundle, and production validation cover the executable code.
+
+## Architecture
+
+```text
+src/
+  manifest.json              Manifest V3 permissions and entry points
+  background.js              Fixed-endpoint service worker and operation coordinator
+  assets/icon.svg            Editable original extension mark
+  content/
+    index.js                  Idempotent content lifecycle and settings reactivation
+    app.js                    Dashboard shell, dailies, progress, and controller routing
+    auto-pricing.js           Price-scan, fresh-review, confirmation, and verification UI
+    auto-buy.js               One-item dry-run and purchase review UI
+    shop-parser.js            Bounded live-page and response parsers
+  popup/                      Toolbar popup
+  options/                    Settings, privacy, import/export, and history
+  shared/                     Constants, validation, storage, network, and operation schemas
+scripts/                      Build, package, branch, manifest, icon, and secret validation
+test/                         Node tests and credential-free HTML fixtures
+docs/design/                  Product design concepts
+docs/evidence/                Sanitized synthetic smoke-test screenshots
+dist/                         Generated unpacked production build (ignored)
+release/                      Generated release archives (ignored)
+tmp/                          Ignored local test artifacts and backups
 ```
 
-The development command watches source files and rebuilds `dist/`. The project is intentionally
-written in vanilla JavaScript, HTML, and CSS; it does not use TypeScript, so there is no separate
-type-check command.
+The content script runs in Chrome's isolated world and builds UI with DOM nodes and `textContent`.
+The service worker owns authenticated requests, rate state, confirmations, and locks. Durable user
+data is sanitized at the storage boundary; service-worker memory is never authoritative.
 
-Useful commands:
+## Permissions and hosts
 
-```powershell
-npm run format
-npm run format:check
-npm run lint
-npm test
-npm run test:coverage
-npm run build
-npm run validate
-npm run secret-scan
-npm run verify
-npm run package
-```
+| Declaration                 | Why it is needed                                                                                               |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `storage`                   | Settings, routines, completion history, schema migration, redacted operation history, and session locks.       |
+| `https://www.neopets.com/*` | Dashboard injection and the fixed authenticated requests used by reviewed pricing and one-item purchase flows. |
 
-`npm run verify` runs formatting verification, linting, 28 behavioral tests, the production build,
-Manifest/file/icon/CSP validation, branding and unsafe-API checks, and the repository secret scan.
+There are no optional permissions, alarms, notifications, scripting, cookies, downloads, history,
+tabs host escalation, external messaging, or web-accessible resources. The top-frame content script
+runs at `document_idle`; incognito use is denied. Official daily images load as ordinary page image
+resources from `https://images.neopets.com` and are never executable code.
 
-## Load the unpacked extension
+## Privacy and local data
 
-1. Run `npm ci` and `npm run build`.
-2. Open `chrome://extensions/` in Chrome.
-3. Enable **Developer mode**.
-4. Choose **Load unpacked**.
-5. Select the repository's `dist/` directory.
+Chrome extension storage contains validated settings, routines, completion state/history, schema
+state, and bounded redacted operation records. Purchase records contain an operation ID, timestamp,
+status, and a one-way listing fingerprint—not account names, store owners, item names, prices,
+response bodies, cookies, or authentication data.
 
-The unpacked-extension directory and production build directory are both `dist/`. Do not load `src/`
-directly.
+Network data goes only to Neopets when a user explicitly starts Auto Pricing or Auto Buy. The
+extension never reads cookie values, passwords, auth headers, browser history, or unrelated account
+data. See [PRIVACY.md](PRIVACY.md) for the complete data-flow table.
 
-## Permissions
+To remove stored data:
 
-Neopian Assistant requests only:
+1. Open **Neopian Assistant Settings**.
+2. Go to **Privacy & Data**.
+3. Select **Clear extension data**.
+4. Review and confirm the destructive action.
 
-- `storage`: stores settings, routines, completion history, migration state, short-lived pricing
-  locks, and redacted operation results in Chrome extension storage.
-- `https://www.neopets.com/*`: shows the dashboard on supported Neopets pages and lets explicitly
-  started Auto Pricing requests reach fixed Neopets endpoints using the browser's existing signed-in
-  session.
-
-There are no optional permissions. The content script runs at `document_idle`, in the isolated
-world, in the top frame only. The extension does not run in incognito mode and exposes no
-web-accessible resources or external message connection.
-
-Official daily item images are loaded from `https://images.neopets.com/items/` under the repository
-owner's stated project-specific approval. Neopian Assistant's extension logo is original.
-
-## Privacy and storage
-
-Settings, custom routines, completion state, history, and redacted operation status remain in Chrome
-extension storage on the local browser profile. The extension reads the visible account name, shop
-item IDs, names, and prices only when needed to validate an explicitly started pricing run. Pricing
-requests go only to fixed HTTPS endpoints on `www.neopets.com`; no data is sent to the project owner
-or another service.
-
-Use **Settings → Privacy & Data** to export, import, or clear extension data. See
-[PRIVACY.md](PRIVACY.md) for the exact data flow and retention behavior.
-
-## Safe use and policy risk
-
-Daily links only navigate; users must mark completion separately. Auto Pricing is off by default,
-starts only from the user's own shop stock page, defaults to dry-run, limits each run to 25 changed
-items or fewer, waits at least six seconds between lookups, never blindly retries a shop update, and
-reports success only after exact verification.
-
-The repository owner has stated that this project has approval for Auto Pricing and official daily
-item icons. That project-specific statement is not a general authorization for other users, forks,
-or deployments. Neopets' published terms broadly restrict automation, so maintainers and users must
-confirm that their own use remains within current permission and rules. The extension contains no
-CAPTCHA bypass, stealth behavior, detection evasion, proxy rotation, credential extraction, or
-security-control circumvention.
-
-Relevant primary sources:
-
-- [Chrome Web Store policies](https://developer.chrome.com/docs/webstore/program-policies/policies)
-- [Chrome user-data policy FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq)
-- [Manifest V3 overview](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
-- [Remote hosted code requirements](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
-- [Chrome extension permissions](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions)
-- [Neopets Terms of Use](https://portal.neopets.com/terms)
-- [Neopian Task Force: Play Fair](https://portal.neopets.com/news/may7-neopian-task-force-play-fair)
+Removing the extension from Chrome also removes its extension storage under Chrome's normal data
+retention behavior.
 
 ## Troubleshooting
 
-- **Dashboard is missing:** confirm global enablement in the popup, verify the page is under
-  `https://www.neopets.com/`, and reload the page after installing or updating the unpacked build.
-- **Auto Pricing cannot start:** open `https://www.neopets.com/market.phtml?type=your`, confirm the
-  signed-in account is visible in the page header, enable Auto Pricing, and leave dry-run on for the
-  first review.
-- **A lookup fails or asks you to wait:** stop the run and wait before retrying. The extension
-  intentionally does not accelerate or evade site limits.
-- **Verification fails after a submitted update:** reload the shop stock page, inspect every price
-  manually, and start a new reviewed operation only after the current state is known.
-- **Settings look corrupt:** use the options-page export first if possible, then clear extension
-  data. Invalid stored values recover to safe defaults.
-- **Build validation fails:** use the supported Node version, run `npm ci`, then rerun
-  `npm run verify`.
+### Dashboard is missing
 
-## Repository structure
+- Confirm the URL starts with `https://www.neopets.com/`.
+- Enable Neopian Assistant from the popup.
+- After a new build, reload the extension on `chrome://extensions/`, then reload the Neopets page.
+- If the extension started disabled, changing the setting now mounts it without requiring a page
+  reload; an install/update still requires Chrome's extension reload.
 
-```text
-src/                    Extension source and Manifest V3 manifest
-  background.js         Fixed-endpoint pricing service worker
-  content/              Dashboard, pricing UI, parsers, and lifecycle
-  popup/                Browser-action popup
-  options/              Settings, privacy, and data controls
-  shared/               Validation, storage, networking, and operation schemas
-scripts/                Build, validation, secret-scan, and packaging tools
-test/                   Node behavioral tests and credential-free HTML fixtures
-docs/design/            Product design concepts
-docs/evidence/          Sanitized clean-profile smoke-test screenshots
-dist/                   Generated unpacked production extension (ignored)
-release/                Generated release archives (ignored)
-```
+### Inspect the service worker
 
-## Release process
+1. Open `chrome://extensions/`.
+2. Find Neopian Assistant.
+3. Select the **service worker** link under **Inspect views**.
+4. Check the Console for generic initialization errors only. Do not paste cookies, request headers,
+   account identifiers, or private response bodies into an issue.
+5. Close DevTools, select **Reload**, and reopen the link to test a clean worker start.
 
-1. Update the synchronized version in `package.json`, `src/manifest.json`,
-   `src/shared/constants.js`, and `CHANGELOG.md`.
-2. Run `npm ci`, `npm audit --audit-level=high`, and `npm run verify`.
-3. Run the clean-profile, fixture-based unpacked-extension smoke test without real credentials or
-   real price updates.
-4. Run `npm run package`.
-5. Inspect `release/neopian-assistant-<version>.zip`, rerun the secret scan, and review the Git diff
-   before creating a release.
+### Auto Pricing cannot start
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
-[AUDIT_REPORT.md](AUDIT_REPORT.md), and [STORE_LISTING.md](STORE_LISTING.md).
+- Use the exact own-stock page: `https://www.neopets.com/market.phtml?type=your`.
+- Confirm Auto Pricing is enabled and start with dry run.
+- Keep the visible signed-in account header and stock form available.
+- If stock changes during review, reload and begin a new scan; do not force the stale plan.
+
+### Auto Buy is unavailable
+
+- Use an exact Shop Wizard results page and switch to the dashboard's **Auto Buy** tab.
+- Confirm the selected result is at or below the configured maximum.
+- If the listing changes or disappears, run a new Shop Wizard search.
+- After an uncertain result, inspect inventory manually and do not retry that listing.
+
+### Shop Wizard asks you to wait
+
+Stop and wait. The extension intentionally respects the response and does not accelerate, rotate, or
+evade site limits.
+
+### Settings fail to load
+
+Export data if the page still permits it, then use the confirmed clear action. Corrupt or excessive
+values sanitize to safe defaults, and versioned migrations are idempotent.
+
+### Build or package validation fails
+
+Use Node 20+, run `npm ci`, then `npm run verify`. Resolve the first reported formatting, lint,
+test, Manifest, icon, CSP, unsafe-API, or secret-scan error before packaging.
+
+## Branches, contributions, and pull requests
+
+Branch names use lowercase kebab-case descriptions and one of these prefixes:
+
+| Prefix      | Use                                      |
+| ----------- | ---------------------------------------- |
+| `feature/`  | New functionality                        |
+| `fix/`      | Normal bug fix                           |
+| `hotfix/`   | Urgent production fix                    |
+| `refactor/` | Code cleanup without behavior changes    |
+| `docs/`     | Documentation                            |
+| `test/`     | Tests                                    |
+| `chore/`    | Maintenance, dependencies, configuration |
+
+Examples: `feature/shop-history`, `fix/price-parser`, `docs/release-guide`.
+
+Before opening a pull request:
+
+1. Create an approved branch and make focused commits.
+2. Add or update tests for behavior changes.
+3. Run `npm run validate:branch`, `npm run verify`, `npm audit`, and `npm run package`.
+4. Review `git status`, `git diff`, generated package contents, and secret-scan output.
+5. Complete `.github/pull_request_template.md`, including consequential-action and live-test
+   disclosures.
+6. Request review; do not weaken a safety control or test merely to make CI pass.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete contribution and review process.
+
+## Releases and versioning
+
+The project follows semantic versioning:
+
+- Patch: compatible defect or documentation correction.
+- Minor: backward-compatible functionality or substantial safety capability.
+- Major: intentional incompatible data, configuration, or behavior change.
+
+Release checklist:
+
+1. Synchronize the version in `package.json`, `package-lock.json`, `src/manifest.json`,
+   `src/shared/constants.js`, `CHANGELOG.md`, and documentation.
+2. Run `npm ci`, `npm audit`, `npm run verify`, and `npm run package`.
+3. Load the exact `dist/` build in Chrome and complete the documented safe smoke tests.
+4. Inspect `release/neopian-assistant-<version>.zip` and confirm only production files are present.
+5. Review the Git diff and secret scan before tagging or publishing.
+
+## Security reporting
+
+Do not put cookies, tokens, passwords, account names, balances, shop history, browser profiles, HAR
+files, or live exploit details in a public issue. Follow [SECURITY.md](SECURITY.md) to establish a
+private reporting channel. Bugs and feature requests can use the repository issue templates when
+they contain no sensitive data.
+
+## Known limitations and policy risk
+
+- Neopets markup can change. Bounded parsers fail closed; maintainers must update selectors and
+  tests when the site changes.
+- Dailies are navigation and local tracking, not verified automation of each destination action.
+- A network failure after a consequential request is inherently ambiguous. The extension records
+  `uncertain`, blocks blind retry, and requires manual inspection.
+- Auto Buy verifies the transaction response; duplicate items already in inventory make generic
+  inventory-name checks insufficient as standalone proof.
+- The Chrome Web Store submission and review process is outside this repository release.
+- Neopets' current terms broadly restrict unauthorized automation. The repository owner states that
+  Auto Pricing and official icon use have project-specific approval; that statement is not general
+  permission for users, forks, or deployments. Auto Buy remains particularly policy-sensitive and
+  should not be enabled without applicable authorization.
+
+Primary policy references:
+
+- [Neopets Terms of Use](https://portal.neopets.com/terms)
+- [Chrome Web Store program policies](https://developer.chrome.com/docs/webstore/program-policies/policies)
+- [Manifest V3 requirements](https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements)
+- [Manifest V3 overview](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+- [Remote hosted code guidance](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code)
 
 ## License status
 
-No software license has been selected. All rights are reserved unless the repository owner adds a
-license.
+No software license has been selected. The package is marked `UNLICENSED`; all rights are reserved
+unless the repository owner adds an explicit license.

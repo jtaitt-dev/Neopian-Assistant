@@ -14,8 +14,8 @@ Your all-in-one companion for smarter Neopets routines.
 
 ## Short description
 
-An unofficial fan-made companion for daily routines, local progress, shop price research, and
-reviewed shop updates on Neopets.
+An unofficial fan-made companion for daily routines, local progress, reviewed shop pricing, and
+guarded one-item shop tools on Neopets.
 
 ## Detailed description
 
@@ -27,16 +27,19 @@ dashboard for `www.neopets.com`.
   review local progress.
 - Use an opt-in Auto Pricing workflow on your own shop stock page. It checks Shop Wizard results at
   a conservative pace, calculates bounded suggestions, supports cancellation and dry-run review,
-  locks one exact plan across tabs, submits at most once, and verifies every selected price before
-  reporting success.
-- Configure themes, density, dailies, Auto Pricing, dry-run, pricing rules, limits, and request
-  spacing.
+  rechecks fresh stock, locks one exact plan across tabs, submits at most once, and verifies every
+  selected price before reporting success.
+- Use a separate disabled-by-default Auto Buy review for one exact Shop Wizard listing. It enforces
+  a hard maximum price, quantity one, a fresh-listing check, hashed duplicate prevention, a
+  cross-tab lock, one request, no retry, and strict response verification.
+- Configure themes, density, dailies, Auto Pricing, Auto Buy, dry-run, pricing rules, limits, and
+  request spacing.
 - Export, import, or clear local extension data from a complete settings page.
 
-Auto Pricing is off by default and dry-run is on by default. The repository owner states that this
-project has specific approval for the automated pricing workflow and official daily item icons. That
-statement is not a general authorization for other users or deployments. Users remain responsible
-for confirming current rules and their own permission.
+Auto Pricing and Auto Buy are off by default and dry-run is on by default. The repository owner
+states that this project has specific approval for the automated pricing workflow and official daily
+item icons. Auto Buy remains policy-sensitive and must not be enabled without applicable
+authorization. None of these statements grants general authorization to other users or deployments.
 
 No analytics, telemetry, ads, developer server, remotely hosted executable code, CAPTCHA bypass,
 stealth behavior, cookie extraction, or blind retry of a shop update is included.
@@ -47,20 +50,20 @@ sponsored by Neopets.
 ## Permissions disclosure
 
 - **Storage:** saves settings, routines, completion history, storage migration state, short-lived
-  pricing locks, and redacted operation status in Chrome extension storage.
+  pricing/purchase locks, and redacted operation status in Chrome extension storage.
 - **Read and change data on `www.neopets.com`:** displays the dashboard and lets user-started
-  pricing operations call fixed Neopets endpoints from the signed-in browser session. The extension
-  does not access other sites.
+  pricing and one-item purchase operations call validated Neopets endpoints from the signed-in
+  browser session. The extension does not access other sites.
 
 There are no optional permissions.
 
 ## User-data disclosure
 
 The extension locally stores preferences, routines, completion history, and redacted operation
-status. During a user-started pricing run it reads the visible account name plus shop item IDs,
-names, and prices, and sends validated item names or reviewed prices only to fixed `www.neopets.com`
-endpoints. It does not collect or transmit passwords, cookie values, session tokens, analytics,
-browsing history, or data to the developer. See [PRIVACY.md](PRIVACY.md).
+status. During a user-started pricing or purchase review it reads only the visible account/shop
+fields needed for the selected operation and sends validated item details or reviewed prices only to
+`www.neopets.com`. It does not collect or transmit passwords, cookie values, session tokens,
+analytics, browsing history, or data to the developer. See [PRIVACY.md](PRIVACY.md).
 
 ## Single purpose
 

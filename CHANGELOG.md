@@ -2,6 +2,47 @@
 
 All notable project changes are documented here.
 
+## 7.9.0 — 2026-07-18
+
+Version 7.8.0 was increased to 7.9.0 because this release adds a backward-compatible guarded
+one-item purchase capability and materially strengthens existing consequential-action boundaries.
+
+### Added
+
+- Disabled-by-default, dry-run-by-default Auto Buy for one exact Shop Wizard listing, with a hard
+  maximum price, quantity fixed at one, strict item/owner/object/price/URL validation, a fresh
+  listing check, short-lived confirmation, cross-tab lock, one-way duplicate fingerprint, 24-hour
+  duplicate blocking, one request, no retry, and strict success-response verification.
+- Separate bounded purchase-operation history and options controls.
+- Tests for maximum-price enforcement, listing validation, duplicate purchases, purchase locks,
+  fresh price/shop state, partial-success classification, strict currency formatting, daily reset
+  boundaries, disabled-startup reactivation, and sender/page validation.
+
+### Changed
+
+- Auto Pricing now fetches and parses fresh authenticated shop stock immediately before issuing a
+  short-lived confirmation. Account, row count, item ID/name, form fields, and current prices must
+  still match the reviewed plan.
+- Selected shop prices now have a hard minimum of 1 NP. Thousands separators must be correctly
+  grouped; malformed commas and internal whitespace are rejected.
+- Consequential requests that may have reached Neopets but cannot be verified are recorded as
+  `uncertain` and never treated as ordinary retryable failures.
+- Manual `anytime` daily tracking resets at the Neopian day boundary so “Today's progress” cannot
+  include an old completion indefinitely.
+- Disabled content-script startup now keeps its settings listener active, allowing later enablement
+  without a page reload.
+- Schema upgrades and sanitization repairs now write their canonical result back once instead of
+  repeating an in-memory migration on every load.
+- Updated the storage schema to version 3 and synchronized the extension/package version at 7.9.0.
+
+### Fixed
+
+- Stale price plans could reach the price-update endpoint without a fresh server comparison.
+- An undercut could calculate a zero sale price, which may remove an item from sale.
+- A failed verification request after a submitted price mutation was mislabeled as a normal failure
+  even though the final shop state was unknown.
+- The dashboard tab grid assumed exactly three tabs.
+
 ## 7.8.0 — 2026-07-18
 
 Version 7.7.9 was increased to 7.8.0 because this release is a substantial backward-compatible
@@ -19,7 +60,7 @@ rebrand and production-hardening update, not a breaking redesign.
   import/export, and data deletion.
 - Reproducible esbuild production build, packaging, Manifest/file/icon/CSP validator, secret
   scanner, Prettier, Biome, npm lockfile, and GitHub Actions CI.
-- Twenty-eight behavioral tests for validation, parsing, storage migration, storage corruption, save
+- Thirty-one behavioral tests for validation, parsing, storage migration, storage corruption, save
   serialization, operation schemas, locks, networking, Manifest configuration, and idempotent
   lifecycle behavior.
 - Complete privacy, security, contribution, audit, store-listing, issue, pull-request, and testing

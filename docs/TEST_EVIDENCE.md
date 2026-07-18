@@ -2,75 +2,103 @@
 
 Evidence date: 2026-07-18
 
-Build: Neopian Assistant 7.8.0 (`dist/`) Browser: Chrome for Testing 151 with a disposable,
-credential-free profile
+Current production build: Neopian Assistant 7.9.0 (`dist/`)
+
+Current release package: `release/neopian-assistant-7.9.0.zip`
 
 ## Automated validation
 
-`npm run verify` passed:
+The current 7.9.0 build passed:
 
-- Prettier format verification.
+- Prettier formatting verification.
 - Biome lint with no warnings.
-- 31 Node behavioral tests, 31 passed, 0 failed, 0 skipped.
+- 45 Node behavioral tests, 45 passed, 0 failed, 0 skipped.
+- `npm run test:coverage`: 65.33% aggregate line coverage, 78.39% branch coverage, and 74.03%
+  function coverage; UI surfaces also require installed-browser validation.
+- Syntax checking of every source JavaScript file.
 - esbuild production build.
-- Manifest V3, file reference, icon dimension/alpha, CSP-safe HTML, branding/version, unsafe API,
-  and production surface validation.
+- Manifest V3, file-reference, icon-dimension/alpha, CSP-safe HTML, branding/version, unsafe-API,
+  and production-surface validation.
 - Repository secret scan with no credential-shaped values, sensitive filenames, or private local
   paths.
+- `npm audit --audit-level=high` with 0 vulnerabilities.
+- Deterministic 21-file release packaging.
 
-## Clean-profile browser matrix
+The expanded suite covers price parsing/limits/verification, fresh shop state, partial-result
+classification, purchase maximums/item/URL identity/visible price/fingerprint/duplicate window/
+locks/response verification, sender/page validation, daily timezone resets, disabled-startup
+reactivation, storage defaults/migration/corruption, timeouts/abort, Manifest references, branding,
+and branch policy.
 
-| Scenario                        | Evidence/result                                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Install/manifest/service worker | Unpacked `dist/` loaded; `background.js` registered as the module service worker.                                                                                                    |
-| Dashboard/intended origin       | One dashboard injected on a synthetic HTTPS `www.neopets.com` shop page.                                                                                                             |
-| Unintended origin               | Synthetic `https://example.com/unmatched` had zero dashboard shells.                                                                                                                 |
-| Reload/idempotency              | Reload retained exactly one shell.                                                                                                                                                   |
-| Multiple tabs                   | Two matched tabs each had one shell; unmatched tab had none.                                                                                                                         |
-| Official item icons             | 31/31 production item icons loaded from `https://images.neopets.com/items/`; sampled assets had an 80 px natural width.                                                              |
-| Popup/options                   | Both extension pages loaded with correct branding, exact tagline/disclaimer, privacy copy, and no console errors.                                                                    |
-| Settings persistence            | Auto Pricing remained enabled in Chrome local storage and after a full browser close/reopen.                                                                                         |
-| Shared-state race regression    | Auto Pricing stayed on the selected tab, the Start control enabled, and service-worker storage agreed with the UI.                                                                   |
-| Approved Auto Pricing dry run   | Two synthetic shop rows received mocked Wizard prices. Both suggestions were reviewable; confirmation showed the synthetic account, two items, price range, and a UUID operation ID. |
-| No real update                  | Dry-run completion reported: “Dry run complete for 2 changes. No prices were submitted.”                                                                                             |
-| HTTP failure                    | Mocked HTTP 503 produced two error rows, a clear failure status, and no review button.                                                                                               |
-| Offline                         | With network state offline, the packaged popup still opened and rendered from local extension assets.                                                                                |
-| Keyboard/focus                  | Tab navigation reached **Save changes** and computed a solid visible focus outline.                                                                                                  |
-| Console                         | Zero errors and zero warnings across the final dashboard, popup, options, successful dry run, failure state, reload, and multi-tab checks.                                           |
+## Prior clean-profile installed-build evidence
 
-No live Neopets account was used. No real lookup credentials, purchase, offer, inventory action, or
-shop update was performed. The fixture account and items are synthetic. The only live evidence
-requests were public, owner-approved official item images.
+The checked-in screenshots were produced with the 7.8.0 production architecture in Chrome for
+Testing 151 using a disposable credential-free profile. The surfaces remain relevant to the shared
+dashboard, popup, options, branding, icon, and Auto Pricing dry-run design; they do not constitute
+installed-build evidence for the new 7.9.0 Auto Buy tab.
 
-## Visual comparison to design concepts
+| Scenario                        | Evidence/result                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Install/manifest/service worker | Unpacked `dist/` loaded; `background.js` registered as the module service worker.                                  |
+| Dashboard/intended origin       | One dashboard injected on a synthetic HTTPS `www.neopets.com` shop page.                                           |
+| Unintended origin               | Synthetic `https://example.com/unmatched` had zero dashboard shells.                                               |
+| Reload/idempotency              | Reload retained exactly one shell.                                                                                 |
+| Multiple tabs                   | Two matched tabs each had one shell; unmatched tab had none.                                                       |
+| Official item icons             | 31/31 production item icons loaded from `https://images.neopets.com/items/`.                                       |
+| Popup/options                   | Both extension pages loaded with correct branding, tagline/disclaimer, privacy copy, and no console errors.        |
+| Settings persistence            | Auto Pricing remained enabled in Chrome local storage and after a full browser close/reopen.                       |
+| Auto Pricing dry run            | Two synthetic rows received mocked Wizard prices; exact review included account, items, range, and operation UUID. |
+| No real update                  | Dry-run completion explicitly reported that no prices were submitted.                                              |
+| HTTP failure                    | Mocked HTTP 503 produced error rows, clear failure status, and no review action.                                   |
+| Offline                         | With network state offline, the packaged popup still rendered from local extension assets.                         |
+| Keyboard/focus                  | Tab navigation reached **Save changes** with a solid visible focus outline.                                        |
+| Console                         | Zero final errors/warnings across dashboard, popup, options, dry run, failure, reload, and multi-tab checks.       |
 
-The implementation follows the concepts in:
+## Authenticated read-only Neopets evidence for 7.9.0
 
-- `docs/design/dashboard-dailies-concept.png`
-- `docs/design/dashboard-auto-pricing-concept.png`
-- `docs/design/popup-options-concept.png`
+The currently signed-in Chrome account was used only for bounded, relevant, non-mutating checks. No
+account identity, balance, shop name, listing owner, object ID, raw HTML, cookie, token, auth
+header, or browser profile was saved.
 
-Comparison outcomes:
+Verified:
 
-1. The hierarchy matches: original brand mark/header, Dailies/Progress/Auto Pricing tabs, prominent
-   primary action, bounded panels, status region, and persistent disclaimer.
-2. The palette matches the intended navy/blue/teal foundation with coral warning/error treatment,
-   light surfaces, subtle borders, and dark/system theme support.
-3. Auto Pricing retains the concept's opt-in toggle, dry-run toggle, bounded rule controls,
-   conservative interval, page/account requirement, progress/cancellation, results table, review
-   step, operation ID, and verification language.
-4. Popup and options preserve the concept's fast global toggle, current-page state, local-data
-   explanation, settings navigation, pricing disclosure, privacy controls, and About/license
-   section.
-5. Production density is intentionally more compact than the high-fidelity concepts so the dashboard
-   remains usable at a 390 px default width and the popup fits Chrome's action surface.
+- Own shop stock uses one `process_market.phtml` POST and indexed `obj_id_N`, `oldcost_N`, and
+  `cost_N` fields.
+- The own shop front does not offer purchase links to its owner.
+- Shop Wizard results use HTTPS `/browseshop.phtml` links with exactly `owner`, `buy_obj_info_id`,
+  and `buy_cost_neopoints`.
+- The visible listing price and URL price matched for the inspected common low-value result.
+- The normalized live listing passed the 7.9.0 source validator and was below the default 1,000 NP
+  ceiling.
+- Live results clear the search input and preserve the item name in
+  `#shopWizardFormResults .wizard-results-header h3`; the parser was repaired and a regression test
+  added.
 
-One intentional change follows the owner's later approval: the concept used abstract daily markers,
-while production uses official Neopets item icons from the restricted `images.neopets.com/items/`
-origin. Neopian Assistant's own compass-spark logo remains original and does not use an official
-Neopets logo or copied game branding.
+No purchase link or shop form was submitted.
 
-## Screenshots
+## Current installed-build gate
+
+Chrome automation rejected access to `chrome://extensions/` under its privileged-URL security
+policy. No workaround, CDP bypass, profile manipulation, or alternate privileged surface was used.
+The user must manually load/reload the exact current `dist/` directory before the following checks
+can be truthfully completed:
+
+- 7.9.0 extension card/version/icon and service-worker registration/restart.
+- Current popup/options/dashboard branding and console state.
+- Settings backup, persistence, and restoration.
+- Dailies navigation/manual completion/reset.
+- Auto Pricing live dry run, one-item controlled update, exact verification, and restoration.
+- Auto Buy live dry run, maximum enforcement, duplicate/multi-tab behavior, and—only if entirely
+  unambiguous—one low-value purchase with strict response/inventory verification.
+
+## Visual comparison
+
+The implementation follows the concepts in `docs/design/` with the original compass-spark extension
+mark, navy/blue/teal visual system, bounded panels, status regions, semantic controls, responsive
+popup/options/dashboard, and project-approved official daily images. Production density remains more
+compact than the high-fidelity concepts for the default 390 px dashboard width.
+
+## Sanitized screenshots
 
 ![Dailies dashboard smoke test](evidence/dashboard-smoke.png)
 
