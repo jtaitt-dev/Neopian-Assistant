@@ -27,6 +27,7 @@
         <a href="#general">General</a>
         <a href="#dailies">Dailies</a>
         <a href="#auto-pricing">Auto Pricing</a>
+        <a href="#auto-buy">Auto Buy</a>
         <a href="#privacy">Privacy &amp; Data</a>
         <a href="#about">About</a>
       </nav>
@@ -152,7 +153,7 @@
               </label>
               <label>
                 Floor price (NP)
-                <input id="pricing-floor" type="number" min="0" max="999999" step="1" />
+                <input id="pricing-floor" type="number" min="1" max="999999" step="1" />
               </label>
               <label>
                 Maximum changed items per run
@@ -167,9 +168,60 @@
           <div class="options-notice options-notice--safe">
             <strong>Verified once, never blindly retried</strong>
             <p>
-              Each run is rate limited. Real updates require an exact-plan confirmation token and a
-              cross-tab lock. The extension submits once, fetches the shop again, and reports
-              success only after every selected price matches.
+              Each run is rate limited. Real updates require a fresh copy of shop stock, exact-plan
+              confirmation, and a cross-tab lock. The extension submits once, fetches the shop
+              again, and reports success only after every selected price matches.
+            </p>
+          </div>
+        </section>
+
+        <section id="auto-buy" class="options-section" aria-labelledby="buying-title">
+          <div class="options-section__heading">
+            <h2 id="buying-title">Auto Buy</h2>
+            <p>A guarded one-item workflow for an explicitly selected Shop Wizard result.</p>
+          </div>
+          <div class="options-notice options-notice--warning">
+            <strong>Off by default, dry-run by default</strong>
+            <p>
+              A real run can spend Neopoints. It is limited to one item, requires an explicit
+              review, rechecks the exact listing, blocks duplicates, and never retries an uncertain
+              result.
+            </p>
+          </div>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <label for="buying-enabled">Enable Auto Buy</label>
+                <p>Permit a reviewed one-item workflow on Shop Wizard results pages.</p>
+              </div>
+              <label class="ui-switch" aria-label="Enable Auto Buy">
+                <input id="buying-enabled" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <label for="buying-dry-run">Dry run</label>
+                <p>Validate and review a listing without following its purchase URL.</p>
+              </div>
+              <label class="ui-switch" aria-label="Use Auto Buy dry-run mode">
+                <input id="buying-dry-run" type="checkbox" />
+                <span class="ui-switch__track"></span>
+              </label>
+            </div>
+            <div class="setting-fields">
+              <label>
+                Maximum purchase price (NP)
+                <input id="buying-maximum-price" type="number" min="1" max="999999" step="1" />
+              </label>
+            </div>
+          </div>
+          <div class="options-notice options-notice--safe">
+            <strong>Exact listing, quantity one, no blind retry</strong>
+            <p>
+              Item name, owner, object ID, visible price, purchase URL, and price ceiling must all
+              match. Uncertain results are retained for duplicate protection and require manual
+              inventory inspection.
             </p>
           </div>
         </section>
@@ -190,9 +242,9 @@
             <article>
               <h3>Transmitted only to Neopets</h3>
               <p>
-                When Auto Pricing runs, validated item names and price updates are sent only to
-                fixed HTTPS endpoints on www.neopets.com using your existing signed-in browser
-                session.
+                When Auto Pricing or Auto Buy runs, validated item details and approved operations
+                are sent only to fixed HTTPS endpoints on www.neopets.com using your existing
+                signed-in browser session.
               </p>
             </article>
             <article>
@@ -214,6 +266,7 @@
             </button>
           </div>
           <div id="operation-history" class="operation-history" aria-live="polite"></div>
+          <div id="purchase-history" class="operation-history" aria-live="polite"></div>
         </section>
 
         <section id="about" class="options-section" aria-labelledby="about-title">

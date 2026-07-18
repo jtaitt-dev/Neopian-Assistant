@@ -10,6 +10,7 @@ import {
   sanitizeDaily,
 } from "../shared/validation.js";
 import { AutoPricingController, createPricingDisclaimer } from "./auto-pricing.js";
+import { AutoBuyController } from "./auto-buy.js";
 
 function formatRemaining(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -37,6 +38,7 @@ export class NeopianAssistantApp {
     this.resizeObserver = null;
     this.resizeTimer = null;
     this.pricing = null;
+    this.buying = null;
     this.closedForPage = false;
   }
 
@@ -129,6 +131,7 @@ export class NeopianAssistantApp {
       ["dailies", "Dailies"],
       ["progress", "Progress"],
       ["pricing", "Auto Pricing"],
+      ["buying", "Auto Buy"],
     ]) {
       const tab = element("button", {
         type: "button",
@@ -188,7 +191,7 @@ export class NeopianAssistantApp {
   }
 
   switchTab(tabId) {
-    if (!["dailies", "progress", "pricing"].includes(tabId)) return;
+    if (!["dailies", "progress", "pricing", "buying"].includes(tabId)) return;
     this.activeTab = tabId;
     for (const tab of this.root.querySelectorAll(".na-tab")) {
       tab.setAttribute("aria-selected", String(tab.dataset.tab === tabId));
@@ -199,6 +202,8 @@ export class NeopianAssistantApp {
   renderActiveTab() {
     this.pricing?.cleanup();
     this.pricing = null;
+    this.buying?.cleanup();
+    this.buying = null;
     this.content.replaceChildren();
     if (this.activeTab === "dailies") this.renderDailies();
     if (this.activeTab === "progress") this.renderProgress();
@@ -209,6 +214,14 @@ export class NeopianAssistantApp {
         announce: (message, tone) => this.announce(message, tone),
       });
       this.pricing.render(this.content);
+    }
+    if (this.activeTab === "buying") {
+      this.buying = new AutoBuyController({
+        data: this.data,
+        save: () => this.save(),
+        announce: (message, tone) => this.announce(message, tone),
+      });
+      this.buying.render(this.content);
     }
   }
 
@@ -802,5 +815,6 @@ export class NeopianAssistantApp {
     if (this.resizeTimer) window.clearTimeout(this.resizeTimer);
     this.resizeObserver?.disconnect();
     this.pricing?.cleanup();
+    this.buying?.cleanup();
   }
 }

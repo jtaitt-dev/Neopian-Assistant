@@ -24,6 +24,9 @@ const controls = {
   pricingFloor: document.getElementById("pricing-floor"),
   pricingMaxItems: document.getElementById("pricing-max-items"),
   pricingInterval: document.getElementById("pricing-interval"),
+  buyingEnabled: document.getElementById("buying-enabled"),
+  buyingDryRun: document.getElementById("buying-dry-run"),
+  buyingMaximumPrice: document.getElementById("buying-maximum-price"),
 };
 
 const status = document.getElementById("status");
@@ -41,6 +44,9 @@ function populateControls() {
   controls.pricingFloor.value = data.settings.autoPricing.floor;
   controls.pricingMaxItems.value = data.settings.autoPricing.maxItems;
   controls.pricingInterval.value = Math.round(data.settings.autoPricing.requestIntervalMs / 1000);
+  controls.buyingEnabled.checked = data.settings.autoBuy.enabled;
+  controls.buyingDryRun.checked = data.settings.autoBuy.dryRun;
+  controls.buyingMaximumPrice.value = data.settings.autoBuy.maximumPrice;
 }
 
 function collectControls() {
@@ -56,6 +62,9 @@ function collectControls() {
   data.settings.autoPricing.maxItems = Number.parseInt(controls.pricingMaxItems.value, 10);
   data.settings.autoPricing.requestIntervalMs =
     Number.parseInt(controls.pricingInterval.value, 10) * 1000;
+  data.settings.autoBuy.enabled = controls.buyingEnabled.checked;
+  data.settings.autoBuy.dryRun = controls.buyingDryRun.checked;
+  data.settings.autoBuy.maximumPrice = Number.parseInt(controls.buyingMaximumPrice.value, 10);
 }
 
 async function save() {
@@ -147,6 +156,7 @@ async function importData(file) {
     data = await saveAppData(imported);
     populateControls();
     await renderOperationHistory();
+    await renderPurchaseHistory();
     setStatus(status, "Validated extension data imported successfully.", "success");
   } catch {
     setStatus(status, "The validated import could not be saved.", "error");
@@ -168,6 +178,7 @@ async function clearData() {
     data = await saveAppData(data);
     populateControls();
     await renderOperationHistory();
+    await renderPurchaseHistory();
     setStatus(status, "Local extension data was cleared and defaults were restored.", "success");
   } catch {
     setStatus(status, "Extension data could not be cleared.", "error");
@@ -204,11 +215,42 @@ async function renderOperationHistory() {
   container.append(list);
 }
 
+async function renderPurchaseHistory() {
+  const container = document.getElementById("purchase-history");
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.purchaseHistory);
+  const history = Array.isArray(stored[STORAGE_KEYS.purchaseHistory])
+    ? stored[STORAGE_KEYS.purchaseHistory]
+    : [];
+  container.replaceChildren();
+  const heading = document.createElement("h3");
+  heading.textContent = "Recent one-item purchase status";
+  container.append(heading);
+  if (history.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = "No Auto Buy operations are recorded on this device.";
+    container.append(empty);
+    return;
+  }
+  const list = document.createElement("ol");
+  for (const record of history.slice(0, 10)) {
+    const item = document.createElement("li");
+    const summary = document.createElement("span");
+    summary.textContent = `1 item — ${record.status}`;
+    const time = document.createElement("time");
+    time.dateTime = new Date(record.timestamp).toISOString();
+    time.textContent = new Date(record.timestamp).toLocaleString();
+    item.append(summary, time);
+    list.append(item);
+  }
+  container.append(list);
+}
+
 async function initialize() {
   try {
     data = await loadAppData();
     populateControls();
     await renderOperationHistory();
+    await renderPurchaseHistory();
     settingsRoot.setAttribute("aria-busy", "false");
     setStatus(status, "Settings loaded.", "success");
   } catch {

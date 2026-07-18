@@ -1,20 +1,34 @@
-import { MESSAGE_TYPES, SHOP_LIMITS, STORAGE_KEYS } from "./shared/constants.js";
+import { MESSAGE_TYPES, PURCHASE_LIMITS, SHOP_LIMITS, STORAGE_KEYS } from "./shared/constants.js";
 import {
+  classifyMutationFailure,
   createPlanFingerprint,
   createShopUpdatePayload,
+  createTextFingerprint,
   createWizardPayload,
   isActiveOperationLock,
   redactOperationRecord,
   validateLookupRequest,
   validatePricingPlan,
 } from "./shared/pricing-operations.js";
+import {
+  createPurchaseFingerprint,
+  isActivePurchaseLock,
+  isDuplicatePurchase,
+  redactPurchaseRecord,
+  validatePurchaseRequest,
+} from "./shared/purchase-operations.js";
 import { fetchWithDeadline } from "./shared/network.js";
+import { validateExtensionSender } from "./shared/message-policy.js";
 import { loadAppData } from "./shared/storage.js";
-import { isOwnShopStockUrl, isPlainObject, isValidUuid } from "./shared/validation.js";
+import { isPlainObject, isValidUuid } from "./shared/validation.js";
 
 const RATE_KEY = "neopianAssistant.runtime.lookupRate";
 const LOCK_KEY = "neopianAssistant.runtime.applyLock";
+const REVIEW_PREFIX = "neopianAssistant.runtime.priceReview.";
 const CONFIRMATION_PREFIX = "neopianAssistant.runtime.confirmation.";
+const PURCHASE_LOCK_KEY = "neopianAssistant.runtime.purchaseLock";
+const PURCHASE_REVIEW_PREFIX = "neopianAssistant.runtime.purchaseReview.";
+const PURCHASE_CONFIRMATION_PREFIX = "neopianAssistant.runtime.purchaseConfirmation.";
 const WIZARD_URL = "https://www.neopets.com/np-templates/ajax/wizard.php";
 const SHOP_URL = "https://www.neopets.com/market.phtml";
 const SHOP_STOCK_URL = "https://www.neopets.com/market.phtml?type=your";
@@ -30,13 +44,12 @@ function userError(message) {
   return error;
 }
 
-function validateSender(sender) {
-  return (
-    sender?.id === chrome.runtime.id &&
-    Number.isInteger(sender.tab?.id) &&
-    typeof sender.tab?.url === "string" &&
-    isOwnShopStockUrl(sender.tab.url)
-  );
+function validatePricingSender(sender) {
+  return validateExtensionSender(sender, chrome.runtime.id, "pricing");
+}
+
+function validatePurchaseSender(sender) {
+  return validateExtensionSender(sender, chrome.runtime.id, "purchase");
 }
 
 async function getPricingSettings() {
@@ -44,6 +57,15 @@ async function getPricingSettings() {
   const settings = data.settings.autoPricing;
   if (!data.settings.enabled || !settings.enabled) {
     throw userError("Auto Pricing is disabled in Neopian Assistant settings.");
+  }
+  return settings;
+}
+
+async function getPurchaseSettings() {
+  const data = await loadAppData();
+  const settings = data.settings.autoBuy;
+  if (!data.settings.enabled || !settings.enabled) {
+    throw userError("Auto Buy is disabled in Neopian Assistant settings.");
   }
   return settings;
 }
@@ -143,16 +165,61 @@ async function prepareApply(message, sender) {
   const settings = await getPricingSettings();
   const validation = validatePricingPlan(message.plan, settings);
   if (!validation.valid) throw userError(validation.error);
-  const token = crypto.randomUUID();
-  const confirmation = {
+  const response = await fetchWithTimeout(
+    SHOP_STOCK_URL,
+    { method: "GET", cache: "no-store" },
+    SHOP_LIMITS.requestTimeoutMs,
+  );
+  if (!response.ok) throw userError(`The fresh shop check returned HTTP ${response.status}.`);
+  const freshShopHtml = await readBoundedText(response);
+  const reviewId = crypto.randomUUID();
+  const review = {
     operationId: message.operationId,
     tabId: sender.tab.id,
     accountContext: validation.plan.accountContext,
     itemCount: validation.selectedCount,
-    fingerprint: await createPlanFingerprint(validation.plan),
-    expiresAt: Date.now() + SHOP_LIMITS.confirmationTtlMs,
+    planFingerprint: await createPlanFingerprint(validation.plan),
+    responseFingerprint: await createTextFingerprint(freshShopHtml),
+    expiresAt: Date.now() + SHOP_LIMITS.freshReviewTtlMs,
   };
-  await chrome.storage.session.set({ [`${CONFIRMATION_PREFIX}${token}`]: confirmation });
+  await chrome.storage.session.set({ [`${REVIEW_PREFIX}${reviewId}`]: review });
+  return { ok: true, reviewId, itemCount: validation.selectedCount, freshShopHtml };
+}
+
+async function confirmApply(message, sender) {
+  if (!isValidUuid(message.operationId) || !isValidUuid(message.reviewId)) {
+    throw userError("The fresh price-review identifiers are invalid.");
+  }
+  const settings = await getPricingSettings();
+  const validation = validatePricingPlan(message.plan, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const reviewKey = `${REVIEW_PREFIX}${message.reviewId}`;
+  const stored = await chrome.storage.session.get(reviewKey);
+  const review = stored[reviewKey];
+  if (
+    message.freshStateVerified !== true ||
+    !isPlainObject(review) ||
+    review.expiresAt <= Date.now() ||
+    review.operationId !== message.operationId ||
+    review.tabId !== sender.tab.id ||
+    review.accountContext !== validation.plan.accountContext ||
+    review.planFingerprint !== (await createPlanFingerprint(validation.plan)) ||
+    review.responseFingerprint !== message.responseFingerprint
+  ) {
+    throw userError("The fresh shop review expired or no longer matches this pricing plan.");
+  }
+  const token = crypto.randomUUID();
+  await chrome.storage.session.set({
+    [`${CONFIRMATION_PREFIX}${token}`]: {
+      operationId: message.operationId,
+      tabId: sender.tab.id,
+      accountContext: validation.plan.accountContext,
+      itemCount: validation.selectedCount,
+      fingerprint: review.planFingerprint,
+      expiresAt: Date.now() + SHOP_LIMITS.confirmationTtlMs,
+    },
+  });
+  await chrome.storage.session.remove(reviewKey);
   return { ok: true, token, itemCount: validation.selectedCount };
 }
 
@@ -201,13 +268,15 @@ async function applyPrices(message, sender) {
   }
 
   await acquireApplyLock(message.operationId, sender.tab.id);
-  await appendOperationRecord({
-    operationId: message.operationId,
-    timestamp: Date.now(),
-    itemCount: validation.selectedCount,
-    status: "running",
-  });
+  let mutationSubmitted = false;
   try {
+    await appendOperationRecord({
+      operationId: message.operationId,
+      timestamp: Date.now(),
+      itemCount: validation.selectedCount,
+      status: "running",
+    });
+    mutationSubmitted = true;
     const updateResponse = await fetchWithTimeout(
       SHOP_URL,
       {
@@ -243,9 +312,14 @@ async function applyPrices(message, sender) {
       operationId: message.operationId,
       timestamp: Date.now(),
       itemCount: validation.selectedCount,
-      status: "failed",
-    });
-    await releaseApplyState(message.operationId, message.token);
+      status: classifyMutationFailure(mutationSubmitted),
+    }).catch(() => undefined);
+    await releaseApplyState(message.operationId, message.token).catch(() => undefined);
+    if (mutationSubmitted) {
+      throw userError(
+        "The price request may have reached Neopets, but its final state could not be verified. Reload shop stock and inspect every price before any manual retry.",
+      );
+    }
     throw error;
   }
 }
@@ -275,29 +349,271 @@ async function recordVerification(message, sender) {
   return { ok: true };
 }
 
+async function readPurchaseHistory() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.purchaseHistory);
+  return Array.isArray(stored[STORAGE_KEYS.purchaseHistory])
+    ? stored[STORAGE_KEYS.purchaseHistory]
+    : [];
+}
+
+async function appendPurchaseRecord(record) {
+  const history = await readPurchaseHistory();
+  const withoutDuplicate = history.filter((entry) => entry.operationId !== record.operationId);
+  withoutDuplicate.unshift(redactPurchaseRecord(record));
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.purchaseHistory]: withoutDuplicate.slice(0, 20),
+  });
+}
+
+async function assertPurchaseNotDuplicate(fingerprint) {
+  if (isDuplicatePurchase(await readPurchaseHistory(), fingerprint)) {
+    throw userError(
+      "This exact listing was already purchased or has an uncertain recent result. No duplicate request was sent.",
+    );
+  }
+}
+
+async function preparePurchase(message, sender) {
+  const settings = await getPurchaseSettings();
+  if (settings.dryRun) throw userError("Disable Auto Buy dry-run mode before a real purchase.");
+  const validation = validatePurchaseRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const fingerprint = await createPurchaseFingerprint(validation.candidate);
+  await assertPurchaseNotDuplicate(fingerprint);
+  await enforceLookupRate(SHOP_LIMITS.minLookupIntervalMs);
+  const response = await fetchWithTimeout(
+    WIZARD_URL,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: createWizardPayload(validation.candidate.itemName),
+      cache: "no-store",
+    },
+    SHOP_LIMITS.requestTimeoutMs,
+  );
+  if (!response.ok)
+    throw userError(`The fresh Shop Wizard check returned HTTP ${response.status}.`);
+  const freshWizardHtml = await readBoundedText(response);
+  const reviewId = crypto.randomUUID();
+  await chrome.storage.session.set({
+    [`${PURCHASE_REVIEW_PREFIX}${reviewId}`]: {
+      operationId: validation.operationId,
+      tabId: sender.tab.id,
+      candidateFingerprint: fingerprint,
+      responseFingerprint: await createTextFingerprint(freshWizardHtml),
+      expiresAt: Date.now() + PURCHASE_LIMITS.reviewTtlMs,
+    },
+  });
+  return { ok: true, reviewId, freshWizardHtml };
+}
+
+async function confirmPurchase(message, sender) {
+  if (!isValidUuid(message.reviewId)) throw userError("The purchase review identifier is invalid.");
+  const settings = await getPurchaseSettings();
+  if (settings.dryRun) throw userError("Disable Auto Buy dry-run mode before a real purchase.");
+  const validation = validatePurchaseRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const candidateFingerprint = await createPurchaseFingerprint(validation.candidate);
+  const reviewKey = `${PURCHASE_REVIEW_PREFIX}${message.reviewId}`;
+  const stored = await chrome.storage.session.get(reviewKey);
+  const review = stored[reviewKey];
+  if (
+    message.freshStateVerified !== true ||
+    !isPlainObject(review) ||
+    review.expiresAt <= Date.now() ||
+    review.operationId !== validation.operationId ||
+    review.tabId !== sender.tab.id ||
+    review.candidateFingerprint !== candidateFingerprint ||
+    review.responseFingerprint !== message.responseFingerprint
+  ) {
+    throw userError("The fresh purchase review expired or no longer matches this listing.");
+  }
+  await assertPurchaseNotDuplicate(candidateFingerprint);
+  const token = crypto.randomUUID();
+  await chrome.storage.session.set({
+    [`${PURCHASE_CONFIRMATION_PREFIX}${token}`]: {
+      operationId: validation.operationId,
+      tabId: sender.tab.id,
+      candidateFingerprint,
+      expiresAt: Date.now() + PURCHASE_LIMITS.confirmationTtlMs,
+    },
+  });
+  await chrome.storage.session.remove(reviewKey);
+  return { ok: true, token };
+}
+
+async function acquirePurchaseLock(operationId, tabId) {
+  const stored = await chrome.storage.session.get(PURCHASE_LOCK_KEY);
+  if (isActivePurchaseLock(stored[PURCHASE_LOCK_KEY])) {
+    throw userError("Another purchase is already running in a different tab.");
+  }
+  await chrome.storage.session.set({
+    [PURCHASE_LOCK_KEY]: {
+      operationId,
+      tabId,
+      expiresAt: Date.now() + PURCHASE_LIMITS.lockTtlMs,
+    },
+  });
+}
+
+async function releasePurchaseState(operationId, token) {
+  const stored = await chrome.storage.session.get(PURCHASE_LOCK_KEY);
+  if (stored[PURCHASE_LOCK_KEY]?.operationId === operationId) {
+    await chrome.storage.session.remove(PURCHASE_LOCK_KEY);
+  }
+  if (token) await chrome.storage.session.remove(`${PURCHASE_CONFIRMATION_PREFIX}${token}`);
+}
+
+async function purchaseItem(message, sender) {
+  if (!isValidUuid(message.token)) throw userError("The purchase confirmation token is invalid.");
+  const settings = await getPurchaseSettings();
+  if (settings.dryRun) throw userError("Disable Auto Buy dry-run mode before a real purchase.");
+  const validation = validatePurchaseRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const candidateFingerprint = await createPurchaseFingerprint(validation.candidate);
+  const confirmationKey = `${PURCHASE_CONFIRMATION_PREFIX}${message.token}`;
+  const stored = await chrome.storage.session.get(confirmationKey);
+  const confirmation = stored[confirmationKey];
+  if (
+    !isPlainObject(confirmation) ||
+    confirmation.expiresAt <= Date.now() ||
+    confirmation.operationId !== validation.operationId ||
+    confirmation.tabId !== sender.tab.id ||
+    confirmation.candidateFingerprint !== candidateFingerprint
+  ) {
+    throw userError("The purchase confirmation expired or no longer matches this listing.");
+  }
+  await assertPurchaseNotDuplicate(candidateFingerprint);
+  await acquirePurchaseLock(validation.operationId, sender.tab.id);
+  let mutationSubmitted = false;
+  try {
+    await appendPurchaseRecord({
+      operationId: validation.operationId,
+      timestamp: Date.now(),
+      status: "running",
+      fingerprint: candidateFingerprint,
+    });
+    mutationSubmitted = true;
+    const response = await fetchWithTimeout(
+      validation.candidate.purchaseUrl,
+      { method: "GET", cache: "no-store", redirect: "follow" },
+      PURCHASE_LIMITS.requestTimeoutMs,
+    );
+    if (!response.ok) throw userError(`The purchase request returned HTTP ${response.status}.`);
+    const purchaseHtml = await readBoundedText(response);
+    await appendPurchaseRecord({
+      operationId: validation.operationId,
+      timestamp: Date.now(),
+      status: "pending_verification",
+      fingerprint: candidateFingerprint,
+    });
+    return { ok: true, operationId: validation.operationId, purchaseHtml };
+  } catch (error) {
+    await appendPurchaseRecord({
+      operationId: validation.operationId,
+      timestamp: Date.now(),
+      status: classifyMutationFailure(mutationSubmitted),
+      fingerprint: candidateFingerprint,
+    }).catch(() => undefined);
+    await releasePurchaseState(validation.operationId, message.token).catch(() => undefined);
+    if (mutationSubmitted) {
+      throw userError(
+        "The purchase request may have reached Neopets, but its final state could not be verified. Check inventory and do not retry this listing.",
+      );
+    }
+    throw error;
+  }
+}
+
+async function recordPurchaseVerification(message, sender) {
+  if (!isValidUuid(message.operationId) || !isValidUuid(message.token)) {
+    throw userError("The purchase verification identifiers are invalid.");
+  }
+  const confirmationKey = `${PURCHASE_CONFIRMATION_PREFIX}${message.token}`;
+  const stored = await chrome.storage.session.get([confirmationKey, PURCHASE_LOCK_KEY]);
+  const confirmation = stored[confirmationKey];
+  const lock = stored[PURCHASE_LOCK_KEY];
+  if (
+    confirmation?.operationId !== message.operationId ||
+    confirmation?.tabId !== sender.tab.id ||
+    lock?.operationId !== message.operationId
+  ) {
+    throw userError("The purchase verification no longer matches the active operation.");
+  }
+  await appendPurchaseRecord({
+    operationId: message.operationId,
+    timestamp: Date.now(),
+    status: message.verified === true ? "verified" : "uncertain",
+    fingerprint: confirmation.candidateFingerprint,
+  });
+  await releasePurchaseState(message.operationId, message.token);
+  return { ok: true };
+}
+
 async function routeMessage(message, sender) {
   if (!isPlainObject(message) || typeof message.type !== "string") {
     throw userError("Unexpected extension message.");
   }
-  if (!validateSender(sender))
-    throw userError("This operation is only allowed on your shop stock page.");
   if (message.type === MESSAGE_TYPES.lookupPrice) {
+    if (!validatePricingSender(sender))
+      throw userError("This operation is only allowed on your shop stock page.");
     const task = lookupQueue.then(() => lookupPrice(message));
     lookupQueue = task.catch(() => undefined);
     return task;
   }
   if (message.type === MESSAGE_TYPES.preparePriceApply) {
+    if (!validatePricingSender(sender))
+      throw userError("This operation is only allowed on your shop stock page.");
     const task = operationQueue.then(() => prepareApply(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }
+  if (message.type === MESSAGE_TYPES.confirmPriceApply) {
+    if (!validatePricingSender(sender))
+      throw userError("This operation is only allowed on your shop stock page.");
+    const task = operationQueue.then(() => confirmApply(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
   if (message.type === MESSAGE_TYPES.applyPrices) {
+    if (!validatePricingSender(sender))
+      throw userError("This operation is only allowed on your shop stock page.");
     const task = operationQueue.then(() => applyPrices(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }
   if (message.type === MESSAGE_TYPES.recordVerification) {
+    if (!validatePricingSender(sender))
+      throw userError("This operation is only allowed on your shop stock page.");
     const task = operationQueue.then(() => recordVerification(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.preparePurchase) {
+    if (!validatePurchaseSender(sender))
+      throw userError("Auto Buy is only allowed on a Shop Wizard results page.");
+    const task = operationQueue.then(() => preparePurchase(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.confirmPurchase) {
+    if (!validatePurchaseSender(sender))
+      throw userError("Auto Buy is only allowed on a Shop Wizard results page.");
+    const task = operationQueue.then(() => confirmPurchase(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.purchaseItem) {
+    if (!validatePurchaseSender(sender))
+      throw userError("Auto Buy is only allowed on a Shop Wizard results page.");
+    const task = operationQueue.then(() => purchaseItem(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.recordPurchaseVerification) {
+    if (!validatePurchaseSender(sender))
+      throw userError("Auto Buy is only allowed on a Shop Wizard results page.");
+    const task = operationQueue.then(() => recordPurchaseVerification(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }
@@ -306,7 +622,7 @@ async function routeMessage(message, sender) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === MESSAGE_TYPES.cancelPriceRun) {
-    if (!validateSender(sender)) {
+    if (!validatePricingSender(sender)) {
       sendResponse({ ok: false, error: "Cancellation is only allowed on your shop stock page." });
       return false;
     }

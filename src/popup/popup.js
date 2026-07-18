@@ -1,7 +1,11 @@
 import { BRAND } from "../shared/constants.js";
 import { element, icon, setStatus } from "../shared/dom.js";
 import { loadAppData, saveAppData } from "../shared/storage.js";
-import { isAllowedNeopetsPageUrl, isOwnShopStockUrl } from "../shared/validation.js";
+import {
+  isAllowedNeopetsPageUrl,
+  isOwnShopStockUrl,
+  isShopWizardUrl,
+} from "../shared/validation.js";
 
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -14,6 +18,7 @@ async function render() {
     const [data, tab] = await Promise.all([loadAppData(), getActiveTab()]);
     const supported = typeof tab?.url === "string" && isAllowedNeopetsPageUrl(tab.url);
     const shopPage = typeof tab?.url === "string" && isOwnShopStockUrl(tab.url);
+    const wizardPage = typeof tab?.url === "string" && isShopWizardUrl(tab.url);
     const enabled = element("input", { type: "checkbox", checked: data.settings.enabled });
     const status = element("div", {
       className: "ui-status",
@@ -77,7 +82,9 @@ async function render() {
       ? "This page is outside the extension's narrow Neopets access."
       : shopPage
         ? `Shop stock detected. Auto Pricing is ${data.settings.autoPricing.enabled ? "available" : "disabled"}.`
-        : "Supported Neopets page. Dailies dashboard is available.";
+        : wizardPage
+          ? `Shop Wizard detected. Auto Buy is ${data.settings.autoBuy.enabled ? "available" : "disabled"}.`
+          : "Supported Neopets page. Dailies dashboard is available.";
 
     app.replaceChildren(
       element("header", { className: "ui-brand" }, [

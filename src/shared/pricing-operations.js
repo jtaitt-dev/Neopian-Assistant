@@ -48,6 +48,9 @@ export function validatePricingPlan(rawPlan, settingsInput) {
   if (selected.length > settings.maxItems) {
     return { valid: false, error: "The selected changes exceed the configured per-run limit." };
   }
+  if (selected.some((row) => row.proposedPrice < 1)) {
+    return { valid: false, error: "Selected shop prices must be at least 1 NP." };
+  }
   return { valid: true, plan: { accountContext, rows }, selectedCount: selected.length };
 }
 
@@ -89,6 +92,12 @@ export async function createPlanFingerprint(plan) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export async function createTextFingerprint(text) {
+  if (typeof text !== "string") throw new TypeError("Fingerprint input must be text.");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function redactOperationRecord(record) {
   return {
     operationId: record.operationId,
@@ -105,4 +114,8 @@ export function isActiveOperationLock(lock, now = Date.now()) {
     Number.isSafeInteger(lock.expiresAt) &&
     lock.expiresAt > now
   );
+}
+
+export function classifyMutationFailure(requestWasSubmitted) {
+  return requestWasSubmitted === true ? "uncertain" : "failed";
 }

@@ -8,9 +8,10 @@ async function initialize() {
   let app = null;
   try {
     const data = await loadAppData();
-    if (!data.settings.enabled) return;
-    app = new NeopianAssistantApp(data);
-    app.mount();
+    if (data.settings.enabled) {
+      app = new NeopianAssistantApp(data);
+      app.mount();
+    }
   } catch {
     console.warn("Neopian Assistant could not initialize on this page.");
   }

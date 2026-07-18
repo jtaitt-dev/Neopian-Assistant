@@ -196,6 +196,16 @@ export function migrateStorageRecord(record) {
   return { data: createDefaultData(), migrated: false };
 }
 
+export function storageRecordNeedsWrite(record, data, migrated) {
+  const stored = record?.[STORAGE_KEYS.data];
+  return (
+    migrated === true ||
+    !isPlainObject(stored) ||
+    stored.schemaVersion !== SCHEMA_VERSION ||
+    JSON.stringify(stored) !== JSON.stringify(data)
+  );
+}
+
 export async function loadAppData() {
   const record = await chrome.storage.local.get([
     STORAGE_KEYS.data,
@@ -203,7 +213,7 @@ export async function loadAppData() {
     LEGACY_STORAGE_KEYS.data,
   ]);
   const { data, migrated } = migrateStorageRecord(record);
-  if (migrated || !isPlainObject(record[STORAGE_KEYS.data])) {
+  if (storageRecordNeedsWrite(record, data, migrated)) {
     await chrome.storage.local.set({
       [STORAGE_KEYS.data]: data,
       [STORAGE_KEYS.migrationComplete]: SCHEMA_VERSION,
@@ -228,6 +238,7 @@ export async function clearAllData() {
   await chrome.storage.local.remove([
     STORAGE_KEYS.data,
     STORAGE_KEYS.operationHistory,
+    STORAGE_KEYS.purchaseHistory,
     STORAGE_KEYS.migrationComplete,
     LEGACY_STORAGE_KEYS.data,
     LEGACY_STORAGE_KEYS.lastResetDate,

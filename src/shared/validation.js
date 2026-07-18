@@ -1,10 +1,11 @@
-import { DEFAULT_SETTINGS, SHOP_LIMITS } from "./constants.js";
+import { DEFAULT_SETTINGS, PURCHASE_LIMITS, SHOP_LIMITS } from "./constants.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ITEM_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,79}$/;
 const SHOP_OBJECT_ID_PATTERN = /^\d{1,16}$/;
 const SHOP_FIELD_PATTERN = /^(?:obj_id|cost)_\d{1,4}$/;
 const USERNAME_PATTERN = /^[A-Za-z0-9_ -]{2,40}$/;
+const SHOP_OWNER_PATTERN = /^[A-Za-z0-9_]{2,40}$/;
 const COOLDOWN_PATTERN = /^(?:daily|monthly|anytime|\d{1,2}[hm]|\d{1,2}\/day)$/;
 
 export function isPlainObject(value) {
@@ -37,7 +38,7 @@ export function boundedInteger(value, minimum, maximum, fallback) {
 export function isAllowedNeopetsPageUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "www.neopets.com";
+    return url.origin === "https://www.neopets.com";
   } catch {
     return false;
   }
@@ -49,10 +50,15 @@ export function isOwnShopStockUrl(value) {
   return url.pathname === "/market.phtml" && url.searchParams.get("type") === "your";
 }
 
+export function isShopWizardUrl(value) {
+  if (!isAllowedNeopetsPageUrl(value)) return false;
+  return new URL(value).pathname === "/shops/wizard.phtml";
+}
+
 export function isAllowedItemIconUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "images.neopets.com";
+    return url.origin === "https://images.neopets.com";
   } catch {
     return false;
   }
@@ -126,7 +132,7 @@ export function sanitizeSettings(raw) {
     );
     defaults.autoPricing.floor = boundedInteger(
       pricing.floor,
-      0,
+      1,
       SHOP_LIMITS.maxPrice,
       defaults.autoPricing.floor,
     );
@@ -141,6 +147,17 @@ export function sanitizeSettings(raw) {
       SHOP_LIMITS.minLookupIntervalMs,
       SHOP_LIMITS.maxLookupIntervalMs,
       defaults.autoPricing.requestIntervalMs,
+    );
+  }
+
+  if (isPlainObject(raw.autoBuy)) {
+    defaults.autoBuy.enabled = raw.autoBuy.enabled === true;
+    defaults.autoBuy.dryRun = raw.autoBuy.dryRun !== false;
+    defaults.autoBuy.maximumPrice = boundedInteger(
+      raw.autoBuy.maximumPrice,
+      1,
+      PURCHASE_LIMITS.absoluteMaximumPrice,
+      defaults.autoBuy.maximumPrice,
     );
   }
   return defaults;
@@ -162,8 +179,9 @@ export function parseNeopointValue(value) {
       : null;
   }
   if (typeof value !== "string") return null;
-  const compact = value.trim().replace(/[\s,]/g, "").replace(/NP$/i, "");
-  if (!/^\d{1,6}$/.test(compact)) return null;
+  const match = value.match(/^\s*(\d{1,6}|\d{1,3}(?:,\d{3}){1,2})\s*(?:NP)?\s*$/i);
+  if (!match) return null;
+  const compact = match[1].replace(/,/g, "");
   const price = Number.parseInt(compact, 10);
   return price <= SHOP_LIMITS.maxPrice ? price : null;
 }
@@ -175,7 +193,7 @@ export function calculateSuggestedPrice(lowestPrice, settings) {
   let result = lowest;
   if (sanitized.rule === "undercut") result -= sanitized.amount;
   if (sanitized.rule === "overcut") result += sanitized.amount;
-  return Math.min(SHOP_LIMITS.maxPrice, Math.max(sanitized.floor, Math.max(0, result)));
+  return Math.min(SHOP_LIMITS.maxPrice, Math.max(1, sanitized.floor, result));
 }
 
 export function isValidUuid(value) {
@@ -226,11 +244,45 @@ export function sanitizeShopRow(raw) {
   };
 }
 
+export function sanitizePurchaseCandidate(raw) {
+  if (!isPlainObject(raw)) return null;
+  const itemName = boundedString(raw.itemName, SHOP_LIMITS.maxItemNameLength);
+  const owner = boundedString(raw.owner, 40);
+  const objectId = boundedString(raw.objectId, SHOP_LIMITS.maxItemIdLength);
+  const price = parseNeopointValue(raw.price);
+  const purchaseUrl = boundedString(raw.purchaseUrl, 500);
+  if (
+    !itemName ||
+    !SHOP_OWNER_PATTERN.test(owner) ||
+    !SHOP_OBJECT_ID_PATTERN.test(objectId) ||
+    price === null ||
+    price < 1 ||
+    !isAllowedNeopetsPageUrl(purchaseUrl)
+  ) {
+    return null;
+  }
+  const url = new URL(purchaseUrl);
+  const allowedKeys = ["owner", "buy_obj_info_id", "buy_cost_neopoints"];
+  const actualKeys = [...url.searchParams.keys()];
+  if (
+    url.pathname !== "/browseshop.phtml" ||
+    actualKeys.length !== allowedKeys.length ||
+    allowedKeys.some((key) => !actualKeys.includes(key)) ||
+    url.searchParams.get("owner") !== owner ||
+    url.searchParams.get("buy_obj_info_id") !== objectId ||
+    parseNeopointValue(url.searchParams.get("buy_cost_neopoints")) !== price
+  ) {
+    return null;
+  }
+  url.hash = "";
+  return { itemName, owner, objectId, price, purchaseUrl: url.href };
+}
+
 export function parseCooldown(value) {
   const cooldown = COOLDOWN_PATTERN.test(value) ? value : "anytime";
   if (cooldown === "daily") return { type: "reset", period: "daily", limit: 1, durationMs: 0 };
   if (cooldown === "monthly") return { type: "reset", period: "monthly", limit: 1, durationMs: 0 };
-  if (cooldown === "anytime") return { type: "manual", period: null, limit: 1, durationMs: 0 };
+  if (cooldown === "anytime") return { type: "manual", period: "daily", limit: 1, durationMs: 0 };
   const count = cooldown.match(/^(\d{1,2})\/day$/);
   if (count)
     return { type: "count", period: "daily", limit: Number.parseInt(count[1], 10), durationMs: 0 };
@@ -240,7 +292,7 @@ export function parseCooldown(value) {
     const multiplier = timer[2] === "h" ? 3_600_000 : 60_000;
     return { type: "timer", period: null, limit: 1, durationMs: amount * multiplier };
   }
-  return { type: "manual", period: null, limit: 1, durationMs: 0 };
+  return { type: "manual", period: "daily", limit: 1, durationMs: 0 };
 }
 
 export function getNeopianDateKey(date = new Date()) {

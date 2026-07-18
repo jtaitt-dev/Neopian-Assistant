@@ -1,11 +1,13 @@
 import { BRAND, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constants.js";
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { calculateSuggestedPrice, isOwnShopStockUrl } from "../shared/validation.js";
+import { createTextFingerprint } from "../shared/pricing-operations.js";
 import {
   extractAccountContext,
   extractShopRows,
   parseWizardResponse,
   verifyAppliedPrices,
+  verifyFreshShopState,
 } from "./shop-parser.js";
 
 function formatPrice(value) {
@@ -87,7 +89,7 @@ export class AutoPricingController {
     });
 
     const amount = createNumberInput(this.settings.amount, 0, SHOP_LIMITS.maxPrice);
-    const floor = createNumberInput(this.settings.floor, 0, SHOP_LIMITS.maxPrice);
+    const floor = createNumberInput(this.settings.floor, 1, SHOP_LIMITS.maxPrice);
     const maxItems = createNumberInput(this.settings.maxItems, 1, SHOP_LIMITS.maxItemsPerRun);
     const requestInterval = createNumberInput(
       Math.round(this.settings.requestIntervalMs / 1000),
@@ -102,7 +104,7 @@ export class AutoPricingController {
       );
       this.settings.floor = Math.min(
         SHOP_LIMITS.maxPrice,
-        Math.max(0, Number.parseInt(floor.value, 10) || 0),
+        Math.max(1, Number.parseInt(floor.value, 10) || 1),
       );
       this.settings.maxItems = Math.min(
         SHOP_LIMITS.maxItemsPerRun,
@@ -456,28 +458,10 @@ export class AutoPricingController {
       return;
     }
     const operationId = crypto.randomUUID();
-    let token = null;
-    if (!this.settings.dryRun) {
-      this.reviewButton.disabled = true;
-      setStatus(this.status, "Preparing a locked review of the selected changes…", "running");
-      try {
-        const response = await this.send({
-          type: MESSAGE_TYPES.preparePriceApply,
-          operationId,
-          plan,
-        });
-        token = response.token;
-      } catch (error) {
-        setStatus(this.status, error.message, "error");
-        this.reviewButton.disabled = false;
-        return;
-      }
-      this.reviewButton.disabled = false;
-    }
-    this.openReviewDialog({ plan, changedRows, operationId, token });
+    this.openReviewDialog({ plan, changedRows, operationId });
   }
 
-  openReviewDialog({ plan, changedRows, operationId, token }) {
+  openReviewDialog({ plan, changedRows, operationId }) {
     const dialog = element("dialog", { className: "na-dialog" });
     const confirmation = element("input", { type: "checkbox" });
     const applyButton = element(
@@ -518,23 +502,43 @@ export class AutoPricingController {
         close();
         return;
       }
-      setStatus(
-        this.status,
-        "Applying the confirmed prices. No automatic retry will occur…",
-        "running",
-      );
       try {
+        setStatus(this.status, "Rechecking fresh shop stock before submission…", "running");
+        const review = await this.send({
+          type: MESSAGE_TYPES.preparePriceApply,
+          operationId,
+          plan,
+        });
+        const freshState = verifyFreshShopState(review.freshShopHtml, plan);
+        if (!freshState.fresh) {
+          throw new Error(
+            "Shop stock changed after the scan. Reload the stock page and start a new price scan.",
+          );
+        }
+        const confirmation = await this.send({
+          type: MESSAGE_TYPES.confirmPriceApply,
+          operationId,
+          reviewId: review.reviewId,
+          plan,
+          responseFingerprint: await createTextFingerprint(review.freshShopHtml),
+          freshStateVerified: true,
+        });
+        setStatus(
+          this.status,
+          "Applying the confirmed prices. No automatic retry will occur…",
+          "running",
+        );
         const response = await this.send({
           type: MESSAGE_TYPES.applyPrices,
           operationId,
-          token,
+          token: confirmation.token,
           plan,
         });
         const verification = verifyAppliedPrices(response.verificationHtml, plan.rows);
         await this.send({
           type: MESSAGE_TYPES.recordVerification,
           operationId,
-          token,
+          token: confirmation.token,
           verified: verification.verified,
         });
         if (!verification.verified) {

@@ -6,12 +6,13 @@ export const BRAND = Object.freeze({
     "Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or sponsored by Neopets.",
 });
 
-export const APP_VERSION = "7.8.0";
-export const SCHEMA_VERSION = 2;
+export const APP_VERSION = "7.9.0";
+export const SCHEMA_VERSION = 3;
 
 export const STORAGE_KEYS = Object.freeze({
   data: "neopianAssistant.data",
   operationHistory: "neopianAssistant.operationHistory",
+  purchaseHistory: "neopianAssistant.purchaseHistory",
   migrationComplete: "neopianAssistant.migrationComplete",
 });
 
@@ -24,8 +25,13 @@ export const MESSAGE_TYPES = Object.freeze({
   lookupPrice: "shop.lookupPrice",
   cancelPriceRun: "shop.cancelPriceRun",
   preparePriceApply: "shop.preparePriceApply",
+  confirmPriceApply: "shop.confirmPriceApply",
   applyPrices: "shop.applyPrices",
   recordVerification: "shop.recordVerification",
+  preparePurchase: "shop.preparePurchase",
+  confirmPurchase: "shop.confirmPurchase",
+  purchaseItem: "shop.purchaseItem",
+  recordPurchaseVerification: "shop.recordPurchaseVerification",
 });
 
 export const SHOP_LIMITS = Object.freeze({
@@ -39,8 +45,19 @@ export const SHOP_LIMITS = Object.freeze({
   requestTimeoutMs: 15_000,
   applyTimeoutMs: 20_000,
   lockTtlMs: 45_000,
-  confirmationTtlMs: 120_000,
+  confirmationTtlMs: 30_000,
+  freshReviewTtlMs: 30_000,
   maxResponseBytes: 2_000_000,
+});
+
+export const PURCHASE_LIMITS = Object.freeze({
+  defaultMaximumPrice: 1_000,
+  absoluteMaximumPrice: 999_999,
+  confirmationTtlMs: 30_000,
+  reviewTtlMs: 30_000,
+  lockTtlMs: 45_000,
+  deduplicationWindowMs: 24 * 60 * 60 * 1000,
+  requestTimeoutMs: 20_000,
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -59,9 +76,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
     dryRun: true,
     rule: "undercut",
     amount: 1,
-    floor: 0,
+    floor: 1,
     maxItems: 10,
     requestIntervalMs: 8_000,
+  },
+  autoBuy: {
+    enabled: false,
+    dryRun: true,
+    maximumPrice: PURCHASE_LIMITS.defaultMaximumPrice,
   },
   privacyAcknowledged: false,
 });
