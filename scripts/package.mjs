@@ -8,6 +8,7 @@ const distribution = resolve(root, "dist");
 const releaseDirectory = resolve(root, "release");
 const manifest = JSON.parse(await readFile(resolve(distribution, "manifest.json"), "utf8"));
 const archive = resolve(releaseDirectory, `neopian-assistant-${manifest.version}.zip`);
+const zipEpoch = new Date(1980, 0, 1, 0, 0, 0);
 
 async function collect(directory, files = {}) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -25,5 +26,5 @@ async function collect(directory, files = {}) {
 await mkdir(releaseDirectory, { recursive: true });
 await rm(archive, { force: true });
 const files = await collect(distribution);
-await writeFile(archive, zipSync(files, { level: 9 }));
+await writeFile(archive, zipSync(files, { level: 9, mtime: zipEpoch }));
 process.stdout.write(`Packaged ${Object.keys(files).length} files at ${archive}\n`);
