@@ -132,13 +132,22 @@ body {
 
 .setting-row select,
 .setting-fields select,
-.setting-fields input {
+.setting-fields input,
+.setting-fields textarea {
   background: var(--ui-bg);
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   min-height: 38px;
   min-width: 190px;
   padding: 7px 9px;
+}
+
+.setting-fields textarea {
+  resize: vertical;
+}
+
+.setting-fields .setting-field--wide {
+  grid-column: 1 / -1;
 }
 
 .setting-fields {
@@ -354,7 +363,8 @@ body {
 
   .setting-row select,
   .setting-fields select,
-  .setting-fields input {
+  .setting-fields input,
+  .setting-fields textarea {
     min-width: 0;
     width: 100%;
   }

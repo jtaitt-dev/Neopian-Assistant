@@ -27,7 +27,7 @@
         <a href="#general">General</a>
         <a href="#dailies">Dailies</a>
         <a href="#auto-pricing">Auto Pricing</a>
-        <a href="#auto-buy">Auto Buy</a>
+        <a href="#auto-buy">SW Autobuy</a>
         <a href="#privacy">Privacy &amp; Data</a>
         <a href="#about">About</a>
       </nav>
@@ -177,8 +177,8 @@
 
         <section id="auto-buy" class="options-section" aria-labelledby="buying-title">
           <div class="options-section__heading">
-            <h2 id="buying-title">Auto Buy</h2>
-            <p>A guarded one-item workflow for an explicitly selected Shop Wizard result.</p>
+            <h2 id="buying-title">SW Autobuy</h2>
+            <p>A live 10-item Shop Wizard watchlist with guarded one-item purchase review.</p>
           </div>
           <div class="options-notice options-notice--warning">
             <strong>Off by default, dry-run by default</strong>
@@ -191,10 +191,12 @@
           <div class="settings-list">
             <div class="setting-row">
               <div>
-                <label for="buying-enabled">Enable Auto Buy</label>
-                <p>Permit a reviewed one-item workflow on Shop Wizard results pages.</p>
+                <label for="buying-enabled">Enable SW Autobuy</label>
+                <p>
+                  Permit read-only monitoring and reviewed one-item actions on Shop Wizard pages.
+                </p>
               </div>
-              <label class="ui-switch" aria-label="Enable Auto Buy">
+              <label class="ui-switch" aria-label="Enable SW Autobuy">
                 <input id="buying-enabled" type="checkbox" />
                 <span class="ui-switch__track"></span>
               </label>
@@ -204,7 +206,7 @@
                 <label for="buying-dry-run">Dry run</label>
                 <p>Validate and review a listing without following its purchase URL.</p>
               </div>
-              <label class="ui-switch" aria-label="Use Auto Buy dry-run mode">
+              <label class="ui-switch" aria-label="Use SW Autobuy dry-run mode">
                 <input id="buying-dry-run" type="checkbox" />
                 <span class="ui-switch__track"></span>
               </label>
@@ -213,6 +215,14 @@
               <label>
                 Maximum purchase price (NP)
                 <input id="buying-maximum-price" type="number" min="1" max="999999" step="1" />
+              </label>
+              <label>
+                Seconds between lookups
+                <input id="buying-interval" type="number" min="6" max="60" step="1" />
+              </label>
+              <label class="setting-field--wide">
+                Watchlist (one exact item name per line; maximum 10)
+                <textarea id="buying-watchlist" rows="7" maxlength="1010"></textarea>
               </label>
             </div>
           </div>
@@ -242,7 +252,7 @@
             <article>
               <h3>Transmitted only to Neopets</h3>
               <p>
-                When Auto Pricing or Auto Buy runs, validated item details and approved operations
+                When Auto Pricing or SW Autobuy runs, validated item details and approved operations
                 are sent only to fixed HTTPS endpoints on www.neopets.com using your existing
                 signed-in browser session.
               </p>

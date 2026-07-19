@@ -44,11 +44,7 @@ async function listFiles(directory, files = []) {
 const findings = [];
 for (const file of await listFiles(root)) {
   const projectPath = relative(root, file).replaceAll("\\", "/");
-  if (
-    projectPath.startsWith("docs/design/") ||
-    ignoredBinaryExtensions.has(extname(file).toLowerCase())
-  )
-    continue;
+  if (ignoredBinaryExtensions.has(extname(file).toLowerCase())) continue;
   if (sensitiveNamePattern.test(projectPath) && !projectPath.endsWith("secret-scan.mjs")) {
     findings.push(`${projectPath}: sensitive filename`);
   }

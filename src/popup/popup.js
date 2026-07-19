@@ -83,7 +83,7 @@ async function render() {
       : shopPage
         ? `Shop stock detected. Auto Pricing is ${data.settings.autoPricing.enabled ? "available" : "disabled"}.`
         : wizardPage
-          ? `Shop Wizard detected. Auto Buy is ${data.settings.autoBuy.enabled ? "available" : "disabled"}.`
+          ? `Shop Wizard detected. SW Autobuy is ${data.settings.autoBuy.enabled ? "available" : "disabled"}.`
           : "Supported Neopets page. Dailies dashboard is available.";
 
     app.replaceChildren(

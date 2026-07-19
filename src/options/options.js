@@ -27,6 +27,8 @@ const controls = {
   buyingEnabled: document.getElementById("buying-enabled"),
   buyingDryRun: document.getElementById("buying-dry-run"),
   buyingMaximumPrice: document.getElementById("buying-maximum-price"),
+  buyingWatchlist: document.getElementById("buying-watchlist"),
+  buyingInterval: document.getElementById("buying-interval"),
 };
 
 const status = document.getElementById("status");
@@ -47,6 +49,8 @@ function populateControls() {
   controls.buyingEnabled.checked = data.settings.autoBuy.enabled;
   controls.buyingDryRun.checked = data.settings.autoBuy.dryRun;
   controls.buyingMaximumPrice.value = data.settings.autoBuy.maximumPrice;
+  controls.buyingWatchlist.value = data.settings.autoBuy.watchlist.join("\n");
+  controls.buyingInterval.value = Math.round(data.settings.autoBuy.requestIntervalMs / 1000);
 }
 
 function collectControls() {
@@ -65,6 +69,9 @@ function collectControls() {
   data.settings.autoBuy.enabled = controls.buyingEnabled.checked;
   data.settings.autoBuy.dryRun = controls.buyingDryRun.checked;
   data.settings.autoBuy.maximumPrice = Number.parseInt(controls.buyingMaximumPrice.value, 10);
+  data.settings.autoBuy.watchlist = controls.buyingWatchlist.value.split(/\r?\n/);
+  data.settings.autoBuy.requestIntervalMs =
+    Number.parseInt(controls.buyingInterval.value, 10) * 1000;
 }
 
 async function save() {
@@ -227,7 +234,7 @@ async function renderPurchaseHistory() {
   container.append(heading);
   if (history.length === 0) {
     const empty = document.createElement("p");
-    empty.textContent = "No Auto Buy operations are recorded on this device.";
+    empty.textContent = "No SW Autobuy operations are recorded on this device.";
     container.append(empty);
     return;
   }

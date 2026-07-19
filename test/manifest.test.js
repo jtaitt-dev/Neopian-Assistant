@@ -8,6 +8,7 @@ const manifest = JSON.parse(
 const packageMetadata = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
+const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 
 test("manifest branding, version, and permission scope stay synchronized", () => {
   assert.equal(manifest.manifest_version, 3);
@@ -28,4 +29,11 @@ test("manifest loads the intended isolated-world entry points only", () => {
   assert.equal(manifest.content_scripts[0].all_frames, false);
   assert.equal(manifest.action.default_popup, "popup/index.html");
   assert.equal(manifest.options_ui.page, "options/index.html");
+});
+
+test("CI uploads the synchronized production build and versioned release archive", () => {
+  const releaseName = `neopian-assistant-${manifest.version}`;
+  assert.match(ciWorkflow, new RegExp(`name: ${releaseName.replaceAll(".", "\\.")}`));
+  assert.match(ciWorkflow, new RegExp(`release/${releaseName.replaceAll(".", "\\.")}\\.zip`));
+  assert.match(ciWorkflow, /(?:^|\n)\s+dist\/\s*(?:\n|$)/);
 });
