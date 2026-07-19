@@ -2,6 +2,54 @@
 
 All notable project changes are documented here.
 
+## 7.10.0 — 2026-07-18
+
+Version 7.9.0 was increased to 7.10.0 because this release adds a backward-compatible live Shop
+Wizard watchlist and its persisted configuration, authorization, cancellation, UI, and tests.
+
+### Added
+
+- SW Autobuy watchlist for up to 10 exact item names, with case-insensitive deduplication, dynamic
+  per-item results, and a review action for the lowest fully validated listing within the configured
+  ceiling.
+- Continuous sequential monitoring while the SW Autobuy dashboard tab remains open, with a
+  configurable 6–60 second interval, shared global lookup pacing, explicit stop control, navigation/
+  tab-switch cancellation, bounded authenticated responses, and no parallel requests.
+- Background authorization that binds each monitor lookup to the saved watchlist, exact Shop Wizard
+  page, feature enablement, canonical item name, and monitor UUID before the same-origin request can
+  run.
+- Settings and regression coverage for watchlist limits, persistence, authorization mismatch,
+  response parsing, and schema migration.
+
+### Changed
+
+- Renamed the user-facing **Auto Buy** tab and controls to **SW Autobuy**.
+- Monitoring remains read-only. A match still requires exact one-item review, a configured hard
+  price ceiling, a fresh listing recheck, short-lived confirmation, cross-tab lock, duplicate
+  protection, one purchase request, strict verification, and no blind retry.
+- Updated the storage schema to version 4 and synchronized the extension/package version at 7.10.0.
+
+### Fixed
+
+- Fresh Auto Pricing checks no longer rely on authenticated `fetch()` returning hydrated shop rows.
+  A bounded hidden same-origin frame waits for Neopets' script-populated paired fields, enforces the
+  existing timeout/size limits, and removes itself on success or failure before strict fresh-state
+  or post-submit verification.
+- One-item SW Autobuy results remain reviewable while the next globally paced lookup authorization
+  is pending instead of briefly reverting to an in-progress state.
+- Opening a monitored result now reports that SW Autobuy stopped before showing its exact review.
+- Real pricing and purchase reviews cannot be dismissed while their request is in flight. Safe
+  pre-submit cancellation remains available, uncertain outcomes stay non-retryable, and Auto Pricing
+  now owns and removes its review dialog during cleanup.
+- CI artifact upload now targets the synchronized 7.10.0 production directory and release archive,
+  with regression coverage preventing future manifest/package/workflow version drift.
+- Pricing lookup and cancellation messages now require UUID run identifiers. Expired/malformed
+  review state is pruned before a new consequential review, and dashboard-owned dialogs are removed
+  during extension cleanup.
+- Auto Pricing plans, fresh-state checks, and mutation payloads now contain only explicitly selected
+  changed rows. Unrelated stock can no longer invalidate a one-item review or be rewritten by its
+  POST, and the review button count updates when selections change.
+
 ## 7.9.0 — 2026-07-18
 
 Version 7.8.0 was increased to 7.9.0 because this release adds a backward-compatible guarded
@@ -37,6 +85,23 @@ one-item purchase capability and materially strengthens existing consequential-a
 
 ### Fixed
 
+- Dashboard settings buttons on Neopets pages now request the options page through a validated
+  service-worker message instead of calling an unavailable content-context API.
+- Stale content UI left behind by an unpacked-extension reload now removes itself when Chrome
+  reports an invalidated extension context instead of emitting an unhandled storage rejection.
+- Shop Wizard response parsing now accepts bounded JSON envelopes containing the same validated
+  result HTML; numeric JSON fields are never trusted as prices.
+- Own-stock item parsing now uses the bounded first-cell image label and cannot mistake the live
+  bold quantity cell for an item name; the legacy bold fallback remains scoped to the first cell.
+- Read-only pricing and Auto Buy fresh-listing checks now fetch bounded Wizard HTML from the
+  authenticated same-origin Neopets content context. Fixed mutation transport now uses that same
+  context only after the service worker validates the exact page/sender/settings/plan, binds fresh
+  response fingerprints, acquires a cross-tab lock, and returns a one-time worker-authored payload
+  or exact purchase URL.
+- Same-origin Wizard requests now use Neopets' official `/shops/wizard.phtml` referrer contract,
+  matching the site's working AJAX flow without changing pricing rules or adding retries.
+- Shop updates now target the live form's exact `/process_market.phtml` action rather than the
+  non-processing stock-display route.
 - Stale price plans could reach the price-update endpoint without a fresh server comparison.
 - An undercut could calculate a zero sale price, which may remove an item from sale.
 - A failed verification request after a submitted price mutation was mislabeled as a normal failure

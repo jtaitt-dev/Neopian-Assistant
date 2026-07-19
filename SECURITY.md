@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest version on the `main` branch. The currently supported
-extension release is 7.9.x.
+extension release is 7.10.x.
 
 ## Reporting a vulnerability
 
@@ -32,10 +32,10 @@ or data you do not own or control.
 In scope:
 
 - Manifest permissions and content-script isolation.
-- Service-worker message validation and fixed network destinations.
+- Service-worker authorization/message validation and fixed same-origin network destinations.
 - Auto Pricing validation, confirmation, locking, idempotency, and verification.
-- Auto Buy item/price/URL validation, fresh-listing binding, duplicate prevention, locking, and
-  response verification.
+- SW Autobuy watchlist authorization, item/price/URL validation, fresh-listing binding, duplicate
+  prevention, locking, and response verification.
 - Storage validation and migration.
 - Import/export behavior and unsafe DOM rendering.
 - Build, packaging, dependency, and secret-exposure risks.
@@ -64,12 +64,16 @@ classification, and exact post-update verification.
 
 ## Consequential-action invariants
 
-- Auto Pricing can mutate only the signed-in user's own shop-stock page, and Auto Buy can act only
-  from a Shop Wizard page.
+- Auto Pricing can mutate only the signed-in user's own shop-stock page, and SW Autobuy can monitor
+  or act only from a Shop Wizard page.
+- Every SW Autobuy lookup must match a persisted bounded watchlist name and monitor UUID; lookups
+  are globally spaced, sequential, cancellable, and read-only.
 - Content messages must originate from this extension in an integer tab whose URL matches the exact
   feature page.
-- Feature enablement, dry-run state, item/account identity, price limits, operation ID, current
-  state, confirmation expiry, fingerprint, and lock ownership are revalidated in the service worker.
+- Feature enablement, dry-run state, plan/item identity, price limits, operation ID, confirmation
+  expiry, fingerprint, and lock ownership are revalidated in the service worker. The isolated
+  content client verifies fresh account/listing state from bounded same-origin responses before a
+  worker-authored payload or exact URL can be transported.
 - A mutation is issued at most once. Any error after submission is `uncertain`, not a retry signal.
 - Price success requires exact fresh shop values; purchase success requires expected item identity
   and unambiguous Neopets success text.

@@ -9,8 +9,8 @@ Describe the user-visible outcome and affected extension surfaces.
 - [ ] New storage, permissions, network destinations, or data flows are documented and validated.
 - [ ] Consequential actions remain explicit, bounded, locked against duplicates, non-retrying, and
       verified.
-- [ ] Auto Pricing and Auto Buy preserve fresh-state checks, strict price limits, one-shot mutation,
-      uncertain-result handling, and dry-run defaults.
+- [ ] Auto Pricing and SW Autobuy preserve bounded sequential lookups, fresh-state checks, strict
+      price limits, one-shot mutation, uncertain-result handling, and dry-run defaults.
 - [ ] No CAPTCHA bypass, stealth, detection evasion, credential access, or security-control
       circumvention is introduced.
 

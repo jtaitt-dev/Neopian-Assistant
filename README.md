@@ -5,14 +5,14 @@
 _Your all-in-one companion for smarter Neopets routines._
 
 Neopian Assistant is a Manifest V3 Chrome extension for organizing Neopets routines, comparing shop
-prices, reviewing price changes, and handling a tightly limited one-item purchase workflow. The
-dashboard is built with vanilla JavaScript, HTML, and CSS and runs only on the audited
+prices, monitoring a bounded Shop Wizard watchlist, and handling a tightly limited one-item purchase
+workflow. The dashboard is built with vanilla JavaScript, HTML, and CSS and runs only on the audited
 `https://www.neopets.com/*` origin.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-Current extension version: **7.9.0**
+Current extension version: **7.10.0**
 
 Manifest version: **3**
 
@@ -26,8 +26,9 @@ Minimum Chrome version: **114**
 | Tracking   | Manual completion            | Stores a local completion mark only after the user presses the separate completion control.    | Extension data only                    |
 | Assistance | Shop Wizard price scan       | Reads validated prices at a conservative interval and prepares suggestions.                    | No                                     |
 | Automation | Reviewed Auto Pricing update | Sends one exact shop-price form after fresh-state validation and explicit confirmation.        | Yes—changes shop prices                |
-| Assistance | Auto Buy dry run             | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
-| Automation | Reviewed one-item Auto Buy   | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
+| Assistance | SW Autobuy live watchlist    | Sequentially monitors up to 10 exact Shop Wizard names while its dashboard tab is open.        | No                                     |
+| Assistance | SW Autobuy dry run           | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
+| Automation | Reviewed one-item SW Autobuy | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
 
 No daily is automatically marked complete. There is no bidding, offering, trading, donating,
 discarding, inventory transfer, CAPTCHA handling, stealth behavior, proxy rotation, credential
@@ -41,7 +42,7 @@ The movable and resizable on-page dashboard provides:
 
 - Light, dark, or system theme.
 - Comfortable or compact density.
-- Dailies, Progress, Auto Pricing, and Auto Buy tabs.
+- Dailies, Progress, Auto Pricing, and SW Autobuy tabs.
 - Searchable and editable daily groups.
 - Polite status announcements, keyboard-operable controls, visible focus, and reduced-motion
   support.
@@ -49,15 +50,16 @@ The movable and resizable on-page dashboard provides:
 
 ### Popup
 
-The toolbar popup shows global enablement, the current page type, whether Auto Pricing or Auto Buy
+The toolbar popup shows global enablement, the current page type, whether Auto Pricing or SW Autobuy
 is available there, a dashboard focus action, settings access, the privacy summary, and the exact
 unofficial disclaimer.
 
 ### Settings
 
-The options page controls global appearance, dailies, Auto Pricing, Auto Buy, dry-run modes, pricing
-limits, local export/import, deletion, and redacted operation history. Imports are schema-validated,
-capped at 1 MB, and require confirmation before replacing data.
+The options page controls global appearance, dailies, Auto Pricing, SW Autobuy, dry-run modes,
+watchlist names, request pacing, price limits, local export/import, deletion, and redacted operation
+history. Imports are schema-validated, capped at 1 MB, and require confirmation before replacing
+data.
 
 ### Dailies
 
@@ -80,9 +82,10 @@ Auto Pricing remains available and is hardened around its approved pricing rules
    6–60 second configured interval.
 4. Review each current, lowest, and suggested price.
 5. For a real update, disable dry run and explicitly authorize the exact plan.
-6. Immediately before submission, the extension fetches fresh shop stock and requires account, row
-   count, item ID, name, field name, and current price to match the reviewed plan.
-7. A short-lived fingerprint-bound confirmation and cross-tab lock permit one POST. There is no
+6. Immediately before submission, the extension fetches fresh shop stock and requires the account
+   plus every selected item's ID, name, field names, and current price to match the reviewed plan.
+7. A short-lived fingerprint-bound confirmation and cross-tab lock permit one POST containing only
+   selected changed rows. Excluded shop rows are neither submitted nor rewritten. There is no
    automatic retry.
 8. The extension fetches shop stock again and reports success only if every selected price exactly
    matches.
@@ -92,21 +95,33 @@ accepted; malformed grouping, internal whitespace, negatives, decimals, empty va
 prices are rejected. If a submitted request cannot be verified, its status is `uncertain` and the
 user is told to reload and inspect stock before any manual retry.
 
-### Auto Buy
+### SW Autobuy
 
-Auto Buy is a guarded one-item workflow, not a bulk buyer.
+SW Autobuy combines a read-only live watchlist with a guarded one-item workflow; it is not a bulk or
+unattended buyer.
 
 1. It is off by default and dry-run is on by default.
-2. Search for an exact item on the official Shop Wizard page.
-3. Set a maximum purchase price; the default is 1,000 NP.
-4. The dashboard chooses the lowest result only when the item name, owner, object ID, visible price,
+2. Save up to 10 exact item names, one per line, and choose a 6–60 second interval between
+   sequential lookups.
+3. Open the official Shop Wizard page and select **Start monitoring**. Monitoring continues only
+   while the SW Autobuy dashboard tab remains open; stopping, switching tabs, navigating, or closing
+   the dashboard aborts it.
+4. Set a maximum purchase price; the default is 1,000 NP and the hard supported maximum is 999,999
+   NP. The monitor shows but cannot review a result above that ceiling.
+5. The dashboard chooses the lowest result only when the item name, owner, object ID, visible price,
    URL price, origin, path, and three allowed query parameters are all valid.
-5. Review quantity one, the exact item, listing price, and configured ceiling.
-6. For a real purchase, the extension reruns the exact Shop Wizard search and requires the same
+6. Select **Review** for one match, then review quantity one, the exact item, listing price, and
+   configured ceiling. Monitoring itself never purchases.
+7. For a real purchase, the extension reruns the exact Shop Wizard search and requires the same
    listing to remain present.
-7. A short-lived confirmation, one-way listing fingerprint, and cross-tab lock authorize one GET to
+8. A short-lived confirmation, one-way listing fingerprint, and cross-tab lock authorize one GET to
    the exact purchase URL. There is no retry.
-8. Success requires the expected item identity and an unambiguous Neopets success response.
+9. Success requires the expected item identity and an unambiguous Neopets success response.
+
+The service worker binds each lookup authorization to a name in the saved watchlist and enforces one
+global lookup interval shared with Auto Pricing. Shop Wizard requests are authenticated same-origin,
+bounded to 2 MB, exact-match searches, sequential, cancellable, and never accelerated through
+parallel requests.
 
 Running, pending-verification, verified, or uncertain fingerprints remain in a bounded local history
 for 24 hours to prevent a duplicate request. An uncertain result must be checked manually in
@@ -117,7 +132,7 @@ inventory and is never treated as permission to retry.
 Dry run is the safe starting point for both consequential features:
 
 - Auto Pricing performs lookups and shows the exact review without posting prices.
-- Auto Buy validates and reviews a listing without following its purchase URL.
+- SW Autobuy validates and reviews a listing without following its purchase URL.
 - Dry-run completion messages explicitly state that no mutation was submitted.
 
 ## Safety protections
@@ -154,7 +169,7 @@ or session data.
 
 ## Install from a release package
 
-1. Obtain `neopian-assistant-7.9.0.zip` from the release artifacts.
+1. Obtain `neopian-assistant-7.10.0.zip` from the release artifacts.
 2. Extract the archive to a permanent local folder.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable **Developer mode**.
@@ -210,13 +225,14 @@ lint, test, bundle, and production validation cover the executable code.
 ```text
 src/
   manifest.json              Manifest V3 permissions and entry points
-  background.js              Fixed-endpoint service worker and operation coordinator
+  background.js              Authorization, rate, token, lock, and operation coordinator
   assets/icon.svg            Editable original extension mark
   content/
     index.js                  Idempotent content lifecycle and settings reactivation
     app.js                    Dashboard shell, dailies, progress, and controller routing
     auto-pricing.js           Price-scan, fresh-review, confirmation, and verification UI
-    auto-buy.js               One-item dry-run and purchase review UI
+    auto-buy.js               Live watchlist, one-item dry run, and purchase review UI
+    shop-client.js            Fixed authenticated stock/update/purchase transport
     shop-parser.js            Bounded live-page and response parsers
   popup/                      Toolbar popup
   options/                    Settings, privacy, import/export, and history
@@ -230,9 +246,12 @@ release/                      Generated release archives (ignored)
 tmp/                          Ignored local test artifacts and backups
 ```
 
-The content script runs in Chrome's isolated world and builds UI with DOM nodes and `textContent`.
-The service worker owns authenticated requests, rate state, confirmations, and locks. Durable user
-data is sanitized at the storage boundary; service-worker memory is never authoritative.
+The content script runs in Chrome's isolated world, builds UI with DOM nodes and `textContent`, and
+performs only fixed same-origin Neopets requests so the signed-in page session is available. The
+service worker remains the authorization boundary: it validates sender/page/settings and plans,
+enforces rates and cross-tab locks, issues short-lived tokens, authors exact mutation payloads, and
+records redacted outcomes. Durable user data is sanitized at the storage boundary; service-worker
+memory is never authoritative.
 
 ## Permissions and hosts
 
@@ -253,7 +272,7 @@ state, and bounded redacted operation records. Purchase records contain an opera
 status, and a one-way listing fingerprint—not account names, store owners, item names, prices,
 response bodies, cookies, or authentication data.
 
-Network data goes only to Neopets when a user explicitly starts Auto Pricing or Auto Buy. The
+Network data goes only to Neopets when a user explicitly starts Auto Pricing or SW Autobuy. The
 extension never reads cookie values, passwords, auth headers, browser history, or unrelated account
 data. See [PRIVACY.md](PRIVACY.md) for the complete data-flow table.
 
@@ -293,11 +312,13 @@ retention behavior.
 - Keep the visible signed-in account header and stock form available.
 - If stock changes during review, reload and begin a new scan; do not force the stale plan.
 
-### Auto Buy is unavailable
+### SW Autobuy is unavailable
 
-- Use an exact Shop Wizard results page and switch to the dashboard's **Auto Buy** tab.
+- Use the exact Shop Wizard page and switch to the dashboard's **SW Autobuy** tab.
+- Save 1–10 exact item names and enable SW Autobuy before starting the monitor.
 - Confirm the selected result is at or below the configured maximum.
-- If the listing changes or disappears, run a new Shop Wizard search.
+- Keep the dashboard tab open. Switching tabs or navigating intentionally stops monitoring.
+- If a reviewed listing changes or disappears, let the monitor find a new validated result.
 - After an uncertain result, inspect inventory manually and do not retry that listing.
 
 ### Shop Wizard asks you to wait
@@ -374,12 +395,12 @@ they contain no sensitive data.
 - Dailies are navigation and local tracking, not verified automation of each destination action.
 - A network failure after a consequential request is inherently ambiguous. The extension records
   `uncertain`, blocks blind retry, and requires manual inspection.
-- Auto Buy verifies the transaction response; duplicate items already in inventory make generic
+- SW Autobuy verifies the transaction response; duplicate items already in inventory make generic
   inventory-name checks insufficient as standalone proof.
 - The Chrome Web Store submission and review process is outside this repository release.
 - Neopets' current terms broadly restrict unauthorized automation. The repository owner states that
   Auto Pricing and official icon use have project-specific approval; that statement is not general
-  permission for users, forks, or deployments. Auto Buy remains particularly policy-sensitive and
+  permission for users, forks, or deployments. SW Autobuy remains particularly policy-sensitive and
   should not be enabled without applicable authorization.
 
 Primary policy references:

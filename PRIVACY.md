@@ -10,15 +10,15 @@ advertising, tracking SDK, developer-operated server, or remotely hosted executa
 
 ## Data the extension reads
 
-| Data                                                       | When read                                          | Purpose                                                                     |
-| ---------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
-| Settings and routines                                      | Startup and settings changes                       | Render enabled features and sanitize or migrate local data.                 |
-| Completion state and history                               | Dashboard display and explicit completion changes  | Show local daily status and progress.                                       |
-| Current Neopets page URL                                   | Popup, content startup, and runtime messages       | Limit each feature to its exact supported page.                             |
-| Visible signed-in account name                             | A price scan or fresh price review                 | Bind Auto Pricing to the account visible on the user's own shop-stock page. |
-| Shop item IDs, names, field names, and prices              | Own shop-stock page and fresh pricing verification | Build, compare, submit, and verify an exact reviewed price plan.            |
-| Shop Wizard item name, listing owner, object ID, and price | Explicit pricing lookup or Auto Buy review         | Validate prices and bind one purchase review to one exact listing.          |
-| Neopets response text                                      | Pricing and purchase operations                    | Parse bounded prices/errors and require unambiguous final verification.     |
+| Data                                                       | When read                                              | Purpose                                                                     |
+| ---------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Settings and routines                                      | Startup and settings changes                           | Render enabled features and sanitize or migrate local data.                 |
+| Completion state and history                               | Dashboard display and explicit completion changes      | Show local daily status and progress.                                       |
+| Current Neopets page URL                                   | Popup, content startup, and runtime messages           | Limit each feature to its exact supported page.                             |
+| Visible signed-in account name                             | A price scan or fresh price review                     | Bind Auto Pricing to the account visible on the user's own shop-stock page. |
+| Shop item IDs, names, field names, and prices              | Own shop-stock page and fresh pricing verification     | Build, compare, submit, and verify an exact reviewed price plan.            |
+| Shop Wizard item name, listing owner, object ID, and price | Explicit pricing lookup, SW Autobuy monitor, or review | Validate prices and bind one purchase review to one exact listing.          |
+| Neopets response text                                      | Pricing and purchase operations                        | Parse bounded prices/errors and require unambiguous final verification.     |
 
 The extension uses the browser's existing signed-in Neopets session for same-origin requests. It
 does not read, extract, store, transmit, or log cookie values, passwords, authentication headers,
@@ -29,12 +29,13 @@ session tokens, browser passwords, account-recovery data, email, or unrelated br
 Chrome extension local storage contains:
 
 - Feature settings, panel position, theme, and density.
+- Up to 10 bounded SW Autobuy watchlist names and the configured sequential lookup interval.
 - Default or custom routine groups, names, approved Neopets URLs, optional official item-image URLs,
   cooldowns, and notes.
 - Manual completion counts, timestamps, and up to 100 completion-history entries.
 - Storage schema and migration state.
 - Up to 20 redacted Auto Pricing records containing operation ID, timestamp, item count, and status.
-- Up to 20 redacted Auto Buy records containing operation ID, timestamp, status, and a one-way
+- Up to 20 redacted SW Autobuy records containing operation ID, timestamp, status, and a one-way
   SHA-256 listing fingerprint used for duplicate prevention.
 
 Purchase history does not store the account name, listing owner, item name, object ID, price,
@@ -47,7 +48,7 @@ or clear with the browser session.
 
 ## Data transmitted
 
-Data leaves the browser only when the user explicitly starts Auto Pricing or Auto Buy.
+Data leaves the browser only when the user explicitly starts Auto Pricing or SW Autobuy.
 
 ### Auto Pricing
 
@@ -58,9 +59,11 @@ Data leaves the browser only when the user explicitly starts Auto Pricing or Aut
 - After opt-in, disabling dry run, exact review, fresh-state comparison, and confirmation, validated
   shop fields and prices are sent once to `https://www.neopets.com/process_market.phtml`.
 
-### Auto Buy
+### SW Autobuy
 
-- The exact item name is sent to the same fixed Shop Wizard endpoint to recheck a selected listing.
+- After the user starts monitoring, saved exact item names are sent sequentially to the same fixed
+  Shop Wizard endpoint at a configured 6–60 second interval while the dashboard tab stays open.
+- Selecting a match sends its exact item name to the same endpoint again to recheck the listing.
 - After opt-in, disabling dry run, price-ceiling validation, fresh-listing comparison, and explicit
   one-item confirmation, the exact validated `https://www.neopets.com/browseshop.phtml` purchase URL
   is requested once.
@@ -97,7 +100,7 @@ identity are never logged.
 
 ## User choices
 
-Global enablement, dailies, Auto Pricing, and Auto Buy are independently controlled. Both
+Global enablement, dailies, Auto Pricing, and SW Autobuy are independently controlled. Both
 consequential features are off by default and dry-run by default. Legacy migration never silently
 enables either feature. Disabling a feature prevents its service-worker requests.
 

@@ -10,8 +10,9 @@ Thank you for helping improve Neopian Assistant.
   project.
 - Do not remove Auto Pricing solely because it is policy-sensitive. Keep it explicit, opt-in,
   conservative, reviewable, cancellable, and verifiable.
-- Keep Auto Buy disabled by default, dry-run by default, quantity one, bounded by a hard maximum,
-  fresh-state checked, duplicate-blocked, cross-tab locked, one-shot, and verified.
+- Keep SW Autobuy disabled by default, dry-run by default, watchlist-bounded, sequential,
+  cancellable, quantity one, bounded by a hard maximum, fresh-state checked, duplicate-blocked,
+  cross-tab locked, one-shot, and verified.
 - Do not add CAPTCHA bypass, anti-bot evasion, stealth behavior, proxy rotation, credential access,
   cookie extraction, hidden automation, or blind retries of consequential actions.
 - Never commit real account data, credentials, browser profiles, logs, HAR files, screenshots with

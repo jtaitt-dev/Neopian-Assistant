@@ -29,16 +29,17 @@ dashboard for `www.neopets.com`.
   a conservative pace, calculates bounded suggestions, supports cancellation and dry-run review,
   rechecks fresh stock, locks one exact plan across tabs, submits at most once, and verifies every
   selected price before reporting success.
-- Use a separate disabled-by-default Auto Buy review for one exact Shop Wizard listing. It enforces
-  a hard maximum price, quantity one, a fresh-listing check, hashed duplicate prevention, a
+- Use a separate disabled-by-default SW Autobuy watchlist for up to 10 exact Shop Wizard names.
+  Monitoring is sequential, user-started, cancellable, and read-only. A reviewed one-item action
+  enforces a hard maximum price, quantity one, a fresh-listing check, hashed duplicate prevention, a
   cross-tab lock, one request, no retry, and strict response verification.
-- Configure themes, density, dailies, Auto Pricing, Auto Buy, dry-run, pricing rules, limits, and
-  request spacing.
+- Configure themes, density, dailies, Auto Pricing, SW Autobuy, dry-run, watchlist names, pricing
+  rules, limits, and request spacing.
 - Export, import, or clear local extension data from a complete settings page.
 
-Auto Pricing and Auto Buy are off by default and dry-run is on by default. The repository owner
+Auto Pricing and SW Autobuy are off by default and dry-run is on by default. The repository owner
 states that this project has specific approval for the automated pricing workflow and official daily
-item icons. Auto Buy remains policy-sensitive and must not be enabled without applicable
+item icons. SW Autobuy remains policy-sensitive and must not be enabled without applicable
 authorization. None of these statements grants general authorization to other users or deployments.
 
 No analytics, telemetry, ads, developer server, remotely hosted executable code, CAPTCHA bypass,
