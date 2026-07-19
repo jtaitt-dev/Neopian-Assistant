@@ -45,6 +45,8 @@ test("legacy storage migrates once without enabling real auto pricing", () => {
   assert.equal(migrated.settings.autoPricing.dryRun, true);
   assert.equal(migrated.settings.autoBuy.enabled, false);
   assert.equal(migrated.settings.autoBuy.dryRun, true);
+  assert.deepEqual(migrated.settings.autoBuy.watchlist, []);
+  assert.equal(migrated.settings.autoBuy.requestIntervalMs, 8000);
   assert.equal(migrated.state[item.id].completed, 1);
   assert.equal(migrated.history[0].itemId, item.id);
   assert.deepEqual(sanitizeAppData(migrated), migrated);
@@ -116,6 +118,7 @@ test("corrupt storage recovers to complete defaults", () => {
   assert.equal(result.data.settings.autoPricing.dryRun, true);
   assert.equal(result.data.settings.autoBuy.enabled, false);
   assert.equal(result.data.settings.autoBuy.dryRun, true);
+  assert.deepEqual(result.data.settings.autoBuy.watchlist, []);
 });
 
 test("sanitization removes invalid groups, duplicate IDs, and unknown state", () => {

@@ -1,6 +1,7 @@
 import { SHOP_LIMITS } from "./constants.js";
 import {
   isPlainObject,
+  isValidUuid,
   sanitizeAccountContext,
   sanitizeLookupItem,
   sanitizeSettings,
@@ -11,7 +12,7 @@ export function validateLookupRequest(message) {
   if (!isPlainObject(message)) return { valid: false, error: "Invalid lookup request." };
   const item = sanitizeLookupItem(message.item);
   if (!item) return { valid: false, error: "The item identifier or name is invalid." };
-  if (typeof message.runId !== "string" || message.runId.length > 80) {
+  if (!isValidUuid(message.runId)) {
     return { valid: false, error: "The pricing run identifier is invalid." };
   }
   return { valid: true, item, runId: message.runId };
@@ -67,11 +68,23 @@ export function createWizardPayload(itemName) {
   return parameters.toString();
 }
 
+export function createWizardRequestOptions(itemName) {
+  return {
+    method: "POST",
+    headers: {
+      Accept: "text/html, */*; q=0.01",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: createWizardPayload(itemName),
+  };
+}
+
 export function createShopUpdatePayload(rows) {
   const parameters = new URLSearchParams({ type: "update_prices" });
-  for (const row of rows) {
+  for (const row of rows.filter((entry) => entry.include === true)) {
     parameters.set(row.objectIdField, row.id);
-    parameters.set(row.priceField, String(row.include ? row.proposedPrice : row.currentPrice));
+    parameters.set(row.priceField, String(row.proposedPrice));
   }
   return parameters.toString();
 }
@@ -96,6 +109,10 @@ export async function createTextFingerprint(text) {
   if (typeof text !== "string") throw new TypeError("Fingerprint input must be text.");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function isTextFingerprint(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 }
 
 export function redactOperationRecord(record) {

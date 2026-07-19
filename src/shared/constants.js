@@ -6,8 +6,8 @@ export const BRAND = Object.freeze({
     "Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or sponsored by Neopets.",
 });
 
-export const APP_VERSION = "7.9.0";
-export const SCHEMA_VERSION = 3;
+export const APP_VERSION = "7.10.0";
+export const SCHEMA_VERSION = 4;
 
 export const STORAGE_KEYS = Object.freeze({
   data: "neopianAssistant.data",
@@ -29,7 +29,10 @@ export const MESSAGE_TYPES = Object.freeze({
   confirmPriceApply: "shop.confirmPriceApply",
   applyPrices: "shop.applyPrices",
   recordVerification: "shop.recordVerification",
+  authorizePurchaseLookup: "shop.authorizePurchaseLookup",
+  cancelPurchaseMonitor: "shop.cancelPurchaseMonitor",
   preparePurchase: "shop.preparePurchase",
+  bindPurchaseReview: "shop.bindPurchaseReview",
   confirmPurchase: "shop.confirmPurchase",
   purchaseItem: "shop.purchaseItem",
   recordPurchaseVerification: "shop.recordPurchaseVerification",
@@ -39,6 +42,7 @@ export const SHOP_LIMITS = Object.freeze({
   maxItemIdLength: 16,
   maxItemNameLength: 100,
   maxItemsPerRun: 25,
+  maxPurchaseWatchlistItems: 10,
   maxShopRows: 100,
   maxPrice: 999_999,
   minLookupIntervalMs: 6_000,
@@ -85,6 +89,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     enabled: false,
     dryRun: true,
     maximumPrice: PURCHASE_LIMITS.defaultMaximumPrice,
+    watchlist: [],
+    requestIntervalMs: 8_000,
   },
   privacyAcknowledged: false,
 });

@@ -724,14 +724,33 @@
 
 .na-field input,
 .na-field select,
+.na-field textarea,
 .na-field__label input,
-.na-field__label select {
+.na-field__label select,
+.na-field__label textarea {
   background: var(--na-bg);
   border: 1px solid var(--na-border);
   border-radius: 8px;
   min-height: 34px;
   padding: 6px 8px;
   width: 100%;
+}
+
+.na-field textarea,
+.na-field__label textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.na-watchlist-field {
+  border-top: 1px solid var(--na-border);
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+}
+
+.na-watchlist-field .na-button {
+  justify-self: start;
 }
 
 .na-notice {
@@ -811,6 +830,52 @@
 .na-results-heading span {
   color: var(--na-muted);
   font-size: 10px;
+}
+
+.na-watchlist-results {
+  margin-top: 10px;
+}
+
+.na-watchlist-empty {
+  color: var(--na-muted);
+  font-size: 10px;
+  margin: 8px 2px;
+}
+
+.na-watchlist-result {
+  align-items: center;
+  border: 1px solid var(--na-border);
+  border-bottom: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px;
+}
+
+.na-results-heading + .na-watchlist-result {
+  border-radius: 10px 10px 0 0;
+}
+
+.na-watchlist-result:last-child {
+  border-bottom: 1px solid var(--na-border);
+  border-radius: 0 0 10px 10px;
+}
+
+.na-watchlist-result > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.na-watchlist-result strong {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.na-watchlist-result span {
+  color: var(--na-muted);
+  font-size: 9px;
+  overflow-wrap: anywhere;
 }
 
 .na-table-scroll {

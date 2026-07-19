@@ -1,10 +1,28 @@
 import { PURCHASE_LIMITS } from "./constants.js";
 import {
+  boundedString,
   isPlainObject,
   isValidUuid,
   sanitizePurchaseCandidate,
+  sanitizePurchaseWatchlist,
   sanitizeSettings,
 } from "./validation.js";
+
+export function validatePurchaseLookupRequest(message, settingsInput) {
+  if (!isPlainObject(message) || !isValidUuid(message.runId)) {
+    return { valid: false, error: "The SW Autobuy monitor identifier is invalid." };
+  }
+  const itemName = boundedString(message.itemName, 100);
+  const settings = sanitizeSettings({ autoBuy: settingsInput }).autoBuy;
+  const watchlist = sanitizePurchaseWatchlist(settings.watchlist);
+  const watchedItem = watchlist.find(
+    (name) => name.toLocaleLowerCase("en-US") === itemName.toLocaleLowerCase("en-US"),
+  );
+  if (!itemName || !watchedItem) {
+    return { valid: false, error: "This item is not in the saved SW Autobuy watchlist." };
+  }
+  return { valid: true, runId: message.runId, itemName: watchedItem, settings };
+}
 
 export function validatePurchaseRequest(message, settingsInput) {
   if (!isPlainObject(message) || !isValidUuid(message.operationId)) {

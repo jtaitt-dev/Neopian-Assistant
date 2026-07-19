@@ -33,10 +33,13 @@ export function extractShopRows(documentObject) {
     const priceInput = row.querySelector("input[name^='cost_']");
     const objectIdInput = row.querySelector("input[name^='obj_id_']");
     if (!priceInput || !objectIdInput) continue;
-    const nameElement = row.querySelector("td:first-child b, b");
+    const firstCell = row.querySelector("td:first-child");
+    const name =
+      boundedString(firstCell?.querySelector("img[alt]")?.getAttribute("alt"), 100) ||
+      boundedString(firstCell?.querySelector("b, strong")?.textContent, 100);
     const candidate = sanitizeShopRow({
       id: objectIdInput.value,
-      name: boundedString(nameElement?.textContent, 100),
+      name,
       objectIdField: objectIdInput.name,
       priceField: priceInput.name,
       currentPrice: priceInput.value,
@@ -60,15 +63,62 @@ export function parseWizardPrices(documentObject) {
   return [...new Set(values)].sort((left, right) => left - right);
 }
 
+function collectWizardHtmlFragments(value, fragments, depth = 0) {
+  if (depth > 5 || fragments.length >= 50) return;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.includes("<") && trimmed.includes(">")) fragments.push(value);
+    if (
+      (trimmed.startsWith("{") ||
+        trimmed.startsWith("[") ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"'))) &&
+      trimmed.length <= 2_000_000
+    ) {
+      try {
+        const nested = JSON.parse(trimmed);
+        if (nested !== value) collectWizardHtmlFragments(nested, fragments, depth + 1);
+      } catch {}
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectWizardHtmlFragments(entry, fragments, depth + 1);
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const entry of Object.values(value)) {
+      collectWizardHtmlFragments(entry, fragments, depth + 1);
+    }
+  }
+}
+
+function readDocumentText(documentObject) {
+  try {
+    return documentObject.body?.textContent || documentObject.documentElement?.textContent || "";
+  } catch {
+    return "";
+  }
+}
+
 export function parseWizardResponse(responseText, parser = new DOMParser()) {
   if (typeof responseText !== "string" || responseText.length === 0) {
     return { prices: [], error: "The Shop Wizard returned an empty response." };
   }
-  const documentObject = parser.parseFromString(responseText, "text/html");
-  const prices = parseWizardPrices(documentObject);
+  const fragments = [responseText];
+  try {
+    collectWizardHtmlFragments(JSON.parse(responseText.trim()), fragments);
+  } catch {}
+  const documents = [...new Set(fragments)].map((fragment) =>
+    parser.parseFromString(fragment, "text/html"),
+  );
+  const prices = [
+    ...new Set(documents.flatMap((documentObject) => parseWizardPrices(documentObject))),
+  ].sort((left, right) => left - right);
   if (prices.length === 0) {
     const text = boundedString(
-      documentObject.body?.textContent || documentObject.documentElement?.textContent || "",
+      [responseText, ...documents.map((documentObject) => readDocumentText(documentObject))].join(
+        " ",
+      ),
       1000,
     ).toLowerCase();
     if (text.includes("too many searches") || text.includes("please wait")) {
@@ -79,54 +129,112 @@ export function parseWizardResponse(responseText, parser = new DOMParser()) {
   return { prices, error: null };
 }
 
+function matchShopRow(actualRows, expected, expectedPrice, claimedIds) {
+  const exact = actualRows.find((row) => row.id === expected.id && !claimedIds.has(row.id));
+  if (exact) return { row: exact, ambiguous: false };
+  const sameName = actualRows.filter(
+    (row) => row.name === expected.name && !claimedIds.has(row.id),
+  );
+  if (sameName.length === 1) return { row: sameName[0], ambiguous: false };
+  if (sameName.length > 1) {
+    const sameState = sameName.filter((row) => row.currentPrice === expectedPrice);
+    if (sameState.length === 1) return { row: sameState[0], ambiguous: false };
+    return { row: null, ambiguous: true };
+  }
+  return { row: null, ambiguous: false };
+}
+
 export function verifyAppliedPrices(responseText, expectedRows, parser = new DOMParser()) {
   if (typeof responseText !== "string" || responseText.length === 0) {
     return { verified: false, mismatches: ["Verification response was empty."] };
   }
   const documentObject = parser.parseFromString(responseText, "text/html");
   const actualRows = extractShopRows(documentObject);
-  const actualById = new Map(actualRows.map((row) => [row.id, row.currentPrice]));
   const mismatches = [];
+  const claimedIds = new Set();
   for (const row of expectedRows.filter((entry) => entry.include)) {
-    const actualPrice = actualById.get(row.id);
-    if (actualPrice !== row.proposedPrice) {
+    const match = matchShopRow(actualRows, row, row.proposedPrice, claimedIds);
+    const actual = match.row;
+    if (
+      !actual ||
+      actual.name !== row.name ||
+      actual.currentPrice !== row.proposedPrice ||
+      claimedIds.has(actual.id)
+    ) {
       mismatches.push(
-        `${row.name}: expected ${row.proposedPrice}, found ${actualPrice ?? "missing"}`,
+        `${row.name}: expected ${row.proposedPrice}, found ${actual?.currentPrice ?? "missing"}`,
       );
+      continue;
     }
+    claimedIds.add(actual.id);
   }
   return { verified: mismatches.length === 0, mismatches };
 }
 
 export function verifyFreshShopState(responseText, plan, parser = new DOMParser()) {
   if (typeof responseText !== "string" || responseText.length === 0) {
-    return { fresh: false, mismatches: ["The fresh shop response was empty."] };
+    return {
+      fresh: false,
+      mismatches: ["The fresh shop response was empty."],
+      mismatchCodes: ["empty response"],
+      plan: null,
+      reboundCount: 0,
+    };
   }
   const documentObject = parser.parseFromString(responseText, "text/html");
   const actualAccount = extractAccountContext(documentObject);
   const actualRows = extractShopRows(documentObject);
-  const expectedRows = Array.isArray(plan?.rows) ? plan.rows : [];
+  const expectedRows = Array.isArray(plan?.rows)
+    ? plan.rows.filter((row) => row.include === true)
+    : [];
   const mismatches = [];
+  const mismatchCodes = new Set();
+  const reboundRows = [];
+  const claimedIds = new Set();
+  let reboundCount = 0;
   if (!actualAccount || actualAccount !== plan?.accountContext) {
     mismatches.push("The signed-in account no longer matches this review.");
+    mismatchCodes.add("account");
   }
-  if (actualRows.length !== expectedRows.length) {
-    mismatches.push("Shop stock changed after the price scan.");
-  }
-  const actualById = new Map(actualRows.map((row) => [row.id, row]));
   for (const expected of expectedRows) {
-    const actual = actualById.get(expected.id);
-    if (
-      !actual ||
-      actual.name !== expected.name ||
-      actual.objectIdField !== expected.objectIdField ||
-      actual.priceField !== expected.priceField ||
-      actual.currentPrice !== expected.currentPrice
-    ) {
-      mismatches.push(`${expected.name}: current shop state changed.`);
+    const match = matchShopRow(actualRows, expected, expected.currentPrice, claimedIds);
+    const actual = match.row;
+    if (!actual) {
+      mismatchCodes.add(match.ambiguous ? "selected item ambiguous" : "selected item missing");
+      mismatches.push(
+        `${expected.name}: current shop state ${match.ambiguous ? "is ambiguous" : "changed"}.`,
+      );
+      continue;
     }
+    if (actual.name !== expected.name) mismatchCodes.add("item name");
+    if (actual.currentPrice !== expected.currentPrice) mismatchCodes.add("current price");
+    if (actual.name !== expected.name || actual.currentPrice !== expected.currentPrice) {
+      mismatches.push(`${expected.name}: current shop state changed.`);
+      continue;
+    }
+    if (
+      actual.id !== expected.id ||
+      actual.objectIdField !== expected.objectIdField ||
+      actual.priceField !== expected.priceField
+    ) {
+      reboundCount += 1;
+    }
+    claimedIds.add(actual.id);
+    reboundRows.push({
+      ...expected,
+      id: actual.id,
+      objectIdField: actual.objectIdField,
+      priceField: actual.priceField,
+    });
   }
-  return { fresh: mismatches.length === 0, mismatches };
+  const fresh = mismatches.length === 0 && reboundRows.length === expectedRows.length;
+  return {
+    fresh,
+    mismatches,
+    mismatchCodes: [...mismatchCodes],
+    plan: fresh ? { accountContext: plan.accountContext, rows: reboundRows } : null,
+    reboundCount,
+  };
 }
 
 export function extractPurchaseCandidates(documentObject, itemNameOverride = "") {
@@ -169,6 +277,21 @@ export function extractPurchaseCandidates(documentObject, itemNameOverride = "")
   return candidates.sort((left, right) => left.price - right.price);
 }
 
+export function parsePurchaseCandidates(responseText, itemName, parser = new DOMParser()) {
+  const boundedItemName = boundedString(itemName, 100);
+  if (typeof responseText !== "string" || responseText.length === 0 || !boundedItemName) return [];
+  const fragments = [responseText];
+  try {
+    collectWizardHtmlFragments(JSON.parse(responseText.trim()), fragments);
+  } catch {}
+  const candidates = [...new Set(fragments)].flatMap((fragment) =>
+    extractPurchaseCandidates(parser.parseFromString(fragment, "text/html"), boundedItemName),
+  );
+  return [
+    ...new Map(candidates.map((candidate) => [candidate.purchaseUrl, candidate])).values(),
+  ].sort((left, right) => left.price - right.price);
+}
+
 export function verifyFreshPurchaseCandidate(
   responseText,
   expectedCandidate,
@@ -177,9 +300,8 @@ export function verifyFreshPurchaseCandidate(
   if (typeof responseText !== "string" || responseText.length === 0) {
     return { fresh: false, error: "The fresh Shop Wizard response was empty." };
   }
-  const documentObject = parser.parseFromString(responseText, "text/html");
   const expected = sanitizePurchaseCandidate(expectedCandidate);
-  const match = extractPurchaseCandidates(documentObject, expected?.itemName).find(
+  const match = parsePurchaseCandidates(responseText, expected?.itemName, parser).find(
     (candidate) =>
       expected &&
       candidate.itemName === expected.itemName &&

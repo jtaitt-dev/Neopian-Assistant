@@ -159,8 +159,30 @@ export function sanitizeSettings(raw) {
       PURCHASE_LIMITS.absoluteMaximumPrice,
       defaults.autoBuy.maximumPrice,
     );
+    defaults.autoBuy.watchlist = sanitizePurchaseWatchlist(raw.autoBuy.watchlist);
+    defaults.autoBuy.requestIntervalMs = boundedInteger(
+      raw.autoBuy.requestIntervalMs,
+      SHOP_LIMITS.minLookupIntervalMs,
+      SHOP_LIMITS.maxLookupIntervalMs,
+      defaults.autoBuy.requestIntervalMs,
+    );
   }
   return defaults;
+}
+
+export function sanitizePurchaseWatchlist(raw) {
+  if (!Array.isArray(raw)) return [];
+  const watchlist = [];
+  const seen = new Set();
+  for (const value of raw) {
+    const itemName = boundedString(value, SHOP_LIMITS.maxItemNameLength);
+    const key = itemName.toLocaleLowerCase("en-US");
+    if (!itemName || seen.has(key)) continue;
+    seen.add(key);
+    watchlist.push(itemName);
+    if (watchlist.length >= SHOP_LIMITS.maxPurchaseWatchlistItems) break;
+  }
+  return watchlist;
 }
 
 export function sanitizeCompletionState(raw) {

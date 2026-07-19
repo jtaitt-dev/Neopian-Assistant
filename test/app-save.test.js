@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NeopianAssistantApp, requestOptionsPage } from "../src/content/app.js";
+import {
+  isExtensionContextInvalidatedError,
+  NeopianAssistantApp,
+  requestOptionsPage,
+} from "../src/content/app.js";
 
 test("content pages request settings through the validated background route", async () => {
   const messages = [];
@@ -66,4 +70,32 @@ test("a failed save does not prevent the next queued save", async () => {
   await recoveredSave;
   assert.equal(attempt, 2);
   assert.equal(app.data.settings.autoPricing.enabled, true);
+});
+
+test("an invalidated extension context removes stale UI without an unhandled save rejection", async () => {
+  let removed = false;
+  let dialogClosed = false;
+  const app = new NeopianAssistantApp(
+    { settings: { autoPricing: { enabled: false } } },
+    {
+      persistData: async () => {
+        throw new Error("Extension context invalidated.");
+      },
+    },
+  );
+  app.root = { remove: () => (removed = true) };
+  app.dialogs.add({ open: true, close: () => (dialogClosed = true) });
+
+  await app.save();
+
+  assert.equal(removed, true);
+  assert.equal(dialogClosed, true);
+  assert.equal(app.dialogs.size, 0);
+  assert.equal(app.root, null);
+  assert.equal(app.closedForPage, true);
+  assert.equal(
+    isExtensionContextInvalidatedError(new Error("Extension context invalidated.")),
+    true,
+  );
+  assert.equal(isExtensionContextInvalidatedError(new Error("ordinary storage failure")), false);
 });

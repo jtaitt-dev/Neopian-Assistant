@@ -33,6 +33,11 @@ export async function requestOptionsPage(
   return response;
 }
 
+export function isExtensionContextInvalidatedError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /extension context invalidated/i.test(message);
+}
+
 export class NeopianAssistantApp {
   constructor(data, { persistData = saveAppData } = {}) {
     this.data = data;
@@ -50,13 +55,38 @@ export class NeopianAssistantApp {
     this.pricing = null;
     this.buying = null;
     this.closedForPage = false;
+    this.dialogs = new Set();
   }
 
   save() {
     const snapshot = cloneValue(this.data);
-    const task = this.saveQueue.then(() => this.persistData(snapshot));
+    const task = this.saveQueue
+      .then(() => this.persistData(snapshot))
+      .then(() => this.data)
+      .catch((error) => {
+        if (!isExtensionContextInvalidatedError(error)) throw error;
+        this.closedForPage = true;
+        this.cleanup();
+        this.root?.remove();
+        this.root = null;
+        return this.data;
+      });
     this.saveQueue = task.catch(() => undefined);
-    return task.then(() => this.data);
+    return task;
+  }
+
+  mountDialog(dialog) {
+    this.dialogs.add(dialog);
+    document.body.append(dialog);
+    dialog.addEventListener(
+      "close",
+      () => {
+        this.dialogs.delete(dialog);
+        dialog.remove();
+      },
+      { once: true },
+    );
+    dialog.showModal();
   }
 
   announce(message, tone = "neutral") {
@@ -149,7 +179,7 @@ export class NeopianAssistantApp {
       ["dailies", "Dailies"],
       ["progress", "Progress"],
       ["pricing", "Auto Pricing"],
-      ["buying", "Auto Buy"],
+      ["buying", "SW Autobuy"],
     ]) {
       const tab = element("button", {
         type: "button",
@@ -658,9 +688,7 @@ export class NeopianAssistantApp {
         ]),
       ]),
     );
-    document.body.append(dialog);
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
-    dialog.showModal();
+    this.mountDialog(dialog);
     input.focus();
   }
 
@@ -739,9 +767,7 @@ export class NeopianAssistantApp {
         ]),
       ]),
     );
-    document.body.append(dialog);
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
-    dialog.showModal();
+    this.mountDialog(dialog);
     name.focus();
   }
 
@@ -775,9 +801,7 @@ export class NeopianAssistantApp {
         ]),
       ]),
     );
-    document.body.append(dialog);
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
-    dialog.showModal();
+    this.mountDialog(dialog);
     confirm.focus();
   }
 
@@ -834,5 +858,10 @@ export class NeopianAssistantApp {
     this.resizeObserver?.disconnect();
     this.pricing?.cleanup();
     this.buying?.cleanup();
+    for (const dialog of [...this.dialogs]) {
+      if (dialog.open) dialog.close();
+      else dialog.remove();
+    }
+    this.dialogs.clear();
   }
 }

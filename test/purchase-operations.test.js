@@ -4,6 +4,7 @@ import {
   createPurchaseFingerprint,
   isActivePurchaseLock,
   isDuplicatePurchase,
+  validatePurchaseLookupRequest,
   validatePurchaseRequest,
 } from "../src/shared/purchase-operations.js";
 
@@ -16,6 +17,29 @@ const candidate = {
   purchaseUrl:
     "https://www.neopets.com/browseshop.phtml?owner=safe_owner&buy_obj_info_id=123456&buy_cost_neopoints=25",
 };
+
+test("SW Autobuy lookup authorization is bound to a saved watchlist item", () => {
+  const settings = {
+    enabled: true,
+    watchlist: ["Healing Potion I"],
+    requestIntervalMs: 8000,
+  };
+  const valid = validatePurchaseLookupRequest(
+    { runId: operationId, itemName: "healing potion i" },
+    settings,
+  );
+  assert.equal(valid.valid, true);
+  assert.equal(valid.itemName, "Healing Potion I");
+  assert.equal(
+    validatePurchaseLookupRequest({ runId: operationId, itemName: "Not Watched" }, settings).valid,
+    false,
+  );
+  assert.equal(
+    validatePurchaseLookupRequest({ runId: "invalid", itemName: "Healing Potion I" }, settings)
+      .valid,
+    false,
+  );
+});
 
 test("purchase validation enforces item integrity and the configured maximum price", () => {
   assert.equal(

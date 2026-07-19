@@ -14,6 +14,7 @@ import {
   sanitizeSettings,
   sanitizeShopRow,
   sanitizePurchaseCandidate,
+  sanitizePurchaseWatchlist,
 } from "../src/shared/validation.js";
 
 test("URL validation permits only the audited Neopets HTTPS origins", () => {
@@ -69,7 +70,13 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
       maxItems: 900,
       requestIntervalMs: 1,
     },
-    autoBuy: { enabled: true, dryRun: false, maximumPrice: 2_000_000 },
+    autoBuy: {
+      enabled: true,
+      dryRun: false,
+      maximumPrice: 2_000_000,
+      requestIntervalMs: 1,
+      watchlist: ["Healing Potion I", "healing potion i", "  Codestone  "],
+    },
   });
   assert.equal(settings.enabled, true);
   assert.equal(settings.autoPricing.enabled, true);
@@ -82,6 +89,21 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
   assert.equal(settings.autoBuy.enabled, true);
   assert.equal(settings.autoBuy.dryRun, false);
   assert.equal(settings.autoBuy.maximumPrice, 999_999);
+  assert.equal(settings.autoBuy.requestIntervalMs, 6000);
+  assert.deepEqual(settings.autoBuy.watchlist, ["Healing Potion I", "Codestone"]);
+});
+
+test("SW Autobuy watchlists are bounded, normalized, and case-insensitively deduplicated", () => {
+  const values = [
+    "  Item One  ",
+    "item one",
+    "Item Two",
+    ...Array.from({ length: 20 }, (_, index) => `Item ${index + 3}`),
+  ];
+  const watchlist = sanitizePurchaseWatchlist(values);
+  assert.equal(watchlist.length, 10);
+  assert.deepEqual(watchlist.slice(0, 2), ["Item One", "Item Two"]);
+  assert.deepEqual(sanitizePurchaseWatchlist("Item One"), []);
 });
 
 test("daily validation strips control characters and rejects off-origin links", () => {

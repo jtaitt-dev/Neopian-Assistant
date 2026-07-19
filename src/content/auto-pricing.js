@@ -2,6 +2,8 @@ import { BRAND, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constants.js";
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { calculateSuggestedPrice, isOwnShopStockUrl } from "../shared/validation.js";
 import { createTextFingerprint } from "../shared/pricing-operations.js";
+import { fetchWizardHtml } from "./wizard-client.js";
+import { loadHydratedShopStockHtml, submitShopUpdate } from "./shop-client.js";
 import {
   extractAccountContext,
   extractShopRows,
@@ -40,6 +42,8 @@ export class AutoPricingController {
     this.progress = null;
     this.resultList = null;
     this.reviewButton = null;
+    this.lookupController = null;
+    this.dialog = null;
   }
 
   get settings() {
@@ -304,12 +308,20 @@ export class AutoPricingController {
         "running",
       );
       try {
-        const response = await this.send({
+        await this.send({
           type: MESSAGE_TYPES.lookupPrice,
           runId: this.runId,
           item: { id: row.id, name: row.name },
         });
-        const parsed = parseWizardResponse(response.responseText);
+        if (this.cancelled) break;
+        this.lookupController = new AbortController();
+        let responseText;
+        try {
+          responseText = await fetchWizardHtml(row.name, { controller: this.lookupController });
+        } finally {
+          this.lookupController = null;
+        }
+        const parsed = parseWizardResponse(responseText);
         const lowestPrice = parsed.prices[0] ?? null;
         this.results.push({
           ...row,
@@ -360,6 +372,7 @@ export class AutoPricingController {
   async cancelScan() {
     if (!this.running || !this.runId) return;
     this.cancelled = true;
+    this.lookupController?.abort("cancelled");
     this.cancelButton.disabled = true;
     try {
       await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.cancelPriceRun, runId: this.runId });
@@ -388,9 +401,14 @@ export class AutoPricingController {
   renderResults() {
     this.resultList.replaceChildren();
     if (this.results.length === 0) return;
+    const selectedCount = this.getChangedResults().length;
+    if (!this.running && this.reviewButton) {
+      this.reviewButton.hidden = selectedCount === 0;
+      this.reviewButton.lastChild.textContent = `Review ${selectedCount} price change${selectedCount === 1 ? "" : "s"}`;
+    }
     const heading = element("div", { className: "na-results-heading" }, [
       element("h3", { text: `Scan results (${this.results.length})` }),
-      element("span", { text: `${this.getChangedResults().length} selected changes` }),
+      element("span", { text: `${selectedCount} selected changes` }),
     ]);
     const table = element("table", { className: "na-price-table" });
     const headRow = element("tr", {}, [
@@ -432,20 +450,16 @@ export class AutoPricingController {
   }
 
   buildPlan() {
-    const byId = new Map(this.results.map((result) => [result.id, result]));
     return {
       accountContext: extractAccountContext(document),
-      rows: this.stockRows.map((row) => {
-        const result = byId.get(row.id);
-        return {
-          ...row,
-          proposedPrice: result?.proposedPrice ?? row.currentPrice,
-          include:
-            result?.include === true &&
-            Number.isSafeInteger(result?.proposedPrice) &&
-            result.proposedPrice !== row.currentPrice,
-        };
-      }),
+      rows: this.results
+        .filter(
+          (result) =>
+            result.include === true &&
+            Number.isSafeInteger(result.proposedPrice) &&
+            result.proposedPrice !== result.currentPrice,
+        )
+        .map((result) => ({ ...result, include: true })),
     };
   }
 
@@ -462,7 +476,9 @@ export class AutoPricingController {
   }
 
   openReviewDialog({ plan, changedRows, operationId }) {
+    if (this.dialog) return;
     const dialog = element("dialog", { className: "na-dialog" });
+    this.dialog = dialog;
     const confirmation = element("input", { type: "checkbox" });
     const applyButton = element(
       "button",
@@ -490,7 +506,31 @@ export class AutoPricingController {
         ]),
       ),
     );
-    const close = () => dialog.close();
+    let submitting = false;
+    const close = ({ force = false } = {}) => {
+      if (submitting && !force) return;
+      dialog.close();
+    };
+    const closeButton = element(
+      "button",
+      { type: "button", className: "na-icon-button", ariaLabel: "Close", onClick: close },
+      icon("close"),
+    );
+    const cancelButton = element(
+      "button",
+      { type: "button", className: "na-button na-button--secondary", onClick: close },
+      "Cancel",
+    );
+    const setSubmitting = (value) => {
+      submitting = value;
+      confirmation.disabled = value;
+      closeButton.disabled = value;
+      cancelButton.disabled = value;
+      applyButton.disabled = value || !confirmation.checked;
+    };
+    dialog.addEventListener("cancel", (event) => {
+      if (submitting) event.preventDefault();
+    });
     applyButton.addEventListener("click", async () => {
       applyButton.disabled = true;
       if (this.settings.dryRun) {
@@ -499,48 +539,65 @@ export class AutoPricingController {
           `Dry run complete for ${changedRows.length} changes. No prices were submitted.`,
           "success",
         );
-        close();
+        close({ force: true });
         return;
       }
+      setSubmitting(true);
+      let executionStarted = false;
+      let outcomeRecorded = false;
+      let executionToken = null;
       try {
         setStatus(this.status, "Rechecking fresh shop stock before submission…", "running");
+        const freshShopHtml = await loadHydratedShopStockHtml();
+        const freshState = verifyFreshShopState(freshShopHtml, plan);
+        if (!freshState.fresh) {
+          const category = freshState.mismatchCodes?.length
+            ? ` Mismatch: ${freshState.mismatchCodes.join(", ")}.`
+            : "";
+          throw new Error(
+            `Shop stock changed after the scan.${category} Reload the stock page and start a new price scan.`,
+          );
+        }
+        const executionPlan = freshState.plan;
+        const responseFingerprint = await createTextFingerprint(freshShopHtml);
         const review = await this.send({
           type: MESSAGE_TYPES.preparePriceApply,
           operationId,
-          plan,
+          plan: executionPlan,
+          responseFingerprint,
+          freshStateVerified: true,
         });
-        const freshState = verifyFreshShopState(review.freshShopHtml, plan);
-        if (!freshState.fresh) {
-          throw new Error(
-            "Shop stock changed after the scan. Reload the stock page and start a new price scan.",
-          );
-        }
-        const confirmation = await this.send({
+        const confirmed = await this.send({
           type: MESSAGE_TYPES.confirmPriceApply,
           operationId,
           reviewId: review.reviewId,
-          plan,
-          responseFingerprint: await createTextFingerprint(review.freshShopHtml),
+          plan: executionPlan,
+          responseFingerprint,
           freshStateVerified: true,
         });
+        executionToken = confirmed.token;
+        const execution = await this.send({
+          type: MESSAGE_TYPES.applyPrices,
+          operationId,
+          token: executionToken,
+          plan: executionPlan,
+        });
+        executionStarted = true;
         setStatus(
           this.status,
           "Applying the confirmed prices. No automatic retry will occur…",
           "running",
         );
-        const response = await this.send({
-          type: MESSAGE_TYPES.applyPrices,
-          operationId,
-          token: confirmation.token,
-          plan,
-        });
-        const verification = verifyAppliedPrices(response.verificationHtml, plan.rows);
+        await submitShopUpdate(execution.updatePayload);
+        const verificationHtml = await loadHydratedShopStockHtml();
+        const verification = verifyAppliedPrices(verificationHtml, executionPlan.rows);
         await this.send({
           type: MESSAGE_TYPES.recordVerification,
           operationId,
-          token: confirmation.token,
+          token: executionToken,
           verified: verification.verified,
         });
+        outcomeRecorded = true;
         if (!verification.verified) {
           setStatus(
             this.status,
@@ -555,10 +612,26 @@ export class AutoPricingController {
           );
           this.announce("Shop prices were applied and verified.", "success");
         }
-        close();
+        close({ force: true });
       } catch (error) {
-        setStatus(this.status, `${error.message} No automatic retry was attempted.`, "error");
-        applyButton.disabled = false;
+        const uncertain = executionStarted && !outcomeRecorded && executionToken;
+        if (uncertain) {
+          await this.send({
+            type: MESSAGE_TYPES.recordVerification,
+            operationId,
+            token: executionToken,
+            verified: false,
+          }).catch(() => undefined);
+          setStatus(
+            this.status,
+            "The price request may have reached Neopets, but its final state could not be verified. Reload shop stock and inspect every price before any manual retry.",
+            "error",
+          );
+        } else {
+          setStatus(this.status, `${error.message} No automatic retry was attempted.`, "error");
+        }
+        setSubmitting(false);
+        if (uncertain) applyButton.disabled = true;
       }
     });
 
@@ -571,11 +644,7 @@ export class AutoPricingController {
             }),
             element("p", { text: `Account: ${plan.accountContext}` }),
           ]),
-          element(
-            "button",
-            { type: "button", className: "na-icon-button", ariaLabel: "Close", onClick: close },
-            icon("close"),
-          ),
+          closeButton,
         ]),
         element("dl", { className: "na-operation-summary" }, [
           element("div", {}, [
@@ -606,24 +675,25 @@ export class AutoPricingController {
             ? "Dry run mode will not submit a shop update."
             : "The extension will submit once, fetch your shop stock again, and report success only after exact verification.",
         }),
-        element("div", { className: "na-dialog__actions" }, [
-          element(
-            "button",
-            { type: "button", className: "na-button na-button--secondary", onClick: close },
-            "Cancel",
-          ),
-          applyButton,
-        ]),
+        element("div", { className: "na-dialog__actions" }, [cancelButton, applyButton]),
       ]),
     );
     document.body.append(dialog);
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    dialog.addEventListener(
+      "close",
+      () => {
+        if (this.dialog === dialog) this.dialog = null;
+        dialog.remove();
+      },
+      { once: true },
+    );
     dialog.showModal();
     confirmation.focus();
   }
 
   cleanup() {
-    if (this.running) void this.cancelScan();
+    if (this.running) void this.cancelScan().catch(() => undefined);
+    this.dialog?.close();
   }
 }
 
