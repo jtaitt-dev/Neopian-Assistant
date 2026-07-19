@@ -49,6 +49,9 @@ Wizard watchlist and its persisted configuration, authorization, cancellation, U
 - Auto Pricing plans, fresh-state checks, and mutation payloads now contain only explicitly selected
   changed rows. Unrelated stock can no longer invalidate a one-item review or be rewritten by its
   POST, and the review button count updates when selections change.
+- Auto Pricing update payloads now match the live Neopets form contract: selected rows are
+  contiguously reindexed and include the exact row count plus each current price as an `oldcost_N`
+  guard. Payloads with missing, duplicate, mismatched, or noncontiguous triplets fail closed.
 
 ## 7.9.0 — 2026-07-18
 

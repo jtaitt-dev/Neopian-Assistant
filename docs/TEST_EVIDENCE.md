@@ -1,6 +1,6 @@
 # Validation and Browser Evidence
 
-Evidence date: 2026-07-18
+Evidence date: 2026-07-19
 
 Current production build: Neopian Assistant 7.10.0 (`dist/`)
 
@@ -13,7 +13,7 @@ The current 7.10.0 build passed:
 - Prettier formatting verification.
 - Biome lint with no warnings.
 - 74 Node behavioral tests, 74 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 75.53% aggregate line coverage, 79.89% branch coverage, and 79.04%
+- `npm run test:coverage`: 75.70% aggregate line coverage, 79.93% branch coverage, and 78.95%
   function coverage; UI surfaces also require installed-browser validation.
 - Syntax checking of every source JavaScript file.
 - esbuild production build.
@@ -22,8 +22,8 @@ The current 7.10.0 build passed:
 - Repository secret scan with no credential-shaped values, sensitive filenames, or private local
   paths.
 - `npm audit --audit-level=high` with 0 vulnerabilities.
-- Deterministic 21-file release packaging: 88,867 bytes, SHA-256
-  `7222DB2BAF0509D1F8261534886D573CE1B8429FCBACF96F2DDA9F268119DB7E` on two consecutive runs.
+- Deterministic 21-file release packaging: 89,133 bytes, SHA-256
+  `DD14B1937A7BCCC7D1B8EBB549EFBC932CCF662620CB59B6E33EC22F2DA89BCF` on two consecutive runs.
 
 The expanded suite covers price parsing/limits/verification, fresh shop state, partial-result
 classification, purchase maximums/item/URL identity/visible price/fingerprint/duplicate window/
@@ -141,8 +141,7 @@ are deselected. Selected-only plan/payload, unrelated-stock freshness, and revie
 raise the rebuilt suite. After the user reloaded the repaired build, an authenticated three-row dry
 scan again selected the same low-value candidate at its unchanged 490 NP price. Deselecting the
 other rows immediately changed **Review 3 price changes** to **Review 1 price change**; the dialog
-contained only the selected 490 NP → 1 NP row, and the acknowledged dry run submitted no price. The
-selected-only real review is ready and remains action-time gated.
+contained only the selected 490 NP → 1 NP row, and the acknowledged dry run submitted no price.
 
 A later read-only comparison isolated why that real review still failed before POST. An
 authenticated programmatic GET returned HTTP 200 and account/form chrome but zero stock rows. A
@@ -152,7 +151,29 @@ polls for a complete paired-field form within a fixed deadline, caps the seriali
 and removes the frame on every exit path. Three new client regressions prove hydrated success,
 timeout cleanup, and oversized-page rejection; the full suite is now 74 tests. A fresh installed
 eight-row scan completed with eight validated suggestions, and deselecting seven left the exact
-one-row review. No update was submitted while action-time confirmation remained pending.
+one-row review.
+
+The next selected-only submission returned without changing the exact live row. The extension did
+not retry it: a reload confirmed the original 490 NP remained in place. The live form requires an
+exact row count plus `obj_id_N`/`oldcost_N`/`cost_N` triplets, while the first selected-only payload
+had omitted the count and prior-price guard. The repaired builder reindexes selected rows
+contiguously, includes the current price as `oldcost_N`, and the content client rejects incomplete,
+duplicated, mismatched, or gapped payloads.
+
+## Current 7.10.0 Auto Pricing mutation evidence
+
+The user authorized the exact reversible low-value pair. The repaired production build then:
+
+- Submitted only the selected row as a contiguous one-row payload with the exact prior-price guard.
+- Reported **Verified 1 shop price change** for 490 NP → 1 NP.
+- Reloaded own stock and independently read the exact row at 1 NP.
+- Ran one new scan, recalculated only the restoration candidate, and submitted 1 NP → 490 NP.
+- Reported exactly one verified restoration and independently read 490 NP after reload.
+- Restored Auto Pricing to disabled, dry run enabled, undercut by 1,000 NP, floor 1, maximum 10, and
+  an 8-second interval; all values persisted across another reload.
+
+No unrelated shop row was submitted or changed. No account identity, balance, shop name, object ID,
+raw HTML, authentication material, or screenshot was saved or committed.
 
 ## Current 7.10.0 SW Autobuy installed-build evidence
 
@@ -198,8 +219,6 @@ No workaround, CDP bypass, profile manipulation, or alternate privileged surface
 manually reloaded the authenticated transport and SW Autobuy build, and the checks above passed. The
 remaining installed-build gates are:
 
-- One controlled low-value price update, verification, and restoration, only after action-time user
-  confirmation.
 - One low-value purchase with strict response verification plus duplicate/multi-tab behavior, only
   after action-time user confirmation.
 - Popup/options internals remain a manual check because privileged `chrome-extension://` pages are

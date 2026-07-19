@@ -85,7 +85,8 @@ Auto Pricing remains available and is hardened around its approved pricing rules
 6. Immediately before submission, the extension fetches fresh shop stock and requires the account
    plus every selected item's ID, name, field names, and current price to match the reviewed plan.
 7. A short-lived fingerprint-bound confirmation and cross-tab lock permit one POST containing only
-   selected changed rows. Excluded shop rows are neither submitted nor rewritten. There is no
+   selected changed rows. Selected rows are reindexed contiguously and carry the live form's row
+   count plus prior-price guard; excluded shop rows are neither submitted nor rewritten. There is no
    automatic retry.
 8. The extension fetches shop stock again and reports success only if every selected price exactly
    matches.

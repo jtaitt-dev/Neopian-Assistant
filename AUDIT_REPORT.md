@@ -105,12 +105,13 @@ executable code, or developer server exists.
 
 ### High
 
-| Finding                                                   | Root cause                                                                                                                                                                           | Repair                                                                                                                                                                                                                                                                                                                                                                       | Validation                                                                                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Price plan could become stale before POST                 | The page was parsed once; worker GETs lacked page-session behavior, and authenticated content-context GETs returned a shell whose stock rows are added later by first-party scripts  | A hidden exact-origin stock frame waits for a bounded paired-field form, serializes it only after hydration, removes itself on success/error/timeout, then performs the exact account/row/ID/name/field/price comparison. The worker still validates sender/settings/plan and binds the snapshot fingerprint before issuing a short-lived token and worker-authored payload. | Live shell-vs-hydrated-frame comparison; fresh-state and client tests cover success, timeout cleanup, oversized pages, rebinding, and ambiguity.         |
-| One selected price included every shop row                | The review plan, fresh-state comparison, and worker-authored POST retained excluded stock rows, so unrelated differences blocked one-item updates and could rewrite untouched prices | Plans and fresh checks now bind only selected changed rows, and the payload contains only their exact ID/price field pairs. Excluded stock is never submitted.                                                                                                                                                                                                               | Two authorized live attempts reproduced the pre-submit failure without mutation; selected-only plan, fresh-state, payload, and review-count regressions. |
-| Consequential post-submit ambiguity mislabeled as failure | The catch path always wrote `failed`, even when the POST may have succeeded and only verification failed                                                                             | Both price and purchase operations track whether the mutation request started. Any later error records `uncertain`, releases short-lived state, warns against retry, and requires manual inspection.                                                                                                                                                                         | Mutation-classification tests; UI/status source review.                                                                                                  |
-| Auto-buy contract absent                                  | The prior release intentionally had no purchase code despite the production objective requiring guarded behavior and coverage                                                        | Added an independent disabled/dry-run default, one-item-only workflow with exact candidate schema, hard ceiling, fresh Wizard recheck, response hash, short token, global lock, one-way 24-hour duplicate key, one request, no retry, and strict response verification.                                                                                                      | Maximum, schema, URL, visible price, dedup, lock, stale, response, settings, sender/page tests plus authenticated read-only live contract validation.    |
+| Finding                                                   | Root cause                                                                                                                                                                           | Repair                                                                                                                                                                                                                                                                                                                                                                       | Validation                                                                                                                                                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Price plan could become stale before POST                 | The page was parsed once; worker GETs lacked page-session behavior, and authenticated content-context GETs returned a shell whose stock rows are added later by first-party scripts  | A hidden exact-origin stock frame waits for a bounded paired-field form, serializes it only after hydration, removes itself on success/error/timeout, then performs the exact account/row/ID/name/field/price comparison. The worker still validates sender/settings/plan and binds the snapshot fingerprint before issuing a short-lived token and worker-authored payload. | Live shell-vs-hydrated-frame comparison; fresh-state and client tests cover success, timeout cleanup, oversized pages, rebinding, and ambiguity.                                                                         |
+| One selected price included every shop row                | The review plan, fresh-state comparison, and worker-authored POST retained excluded stock rows, so unrelated differences blocked one-item updates and could rewrite untouched prices | Plans and fresh checks now bind only selected changed rows. The mutation reindexes those rows contiguously and submits only their exact object ID, prior-price guard, and proposed price with the selected row count. Excluded stock is never submitted.                                                                                                                     | Two authorized live attempts reproduced the pre-submit failure without mutation; selected-only plan, fresh-state, payload, and review-count regressions.                                                                 |
+| Selected-only POST was accepted as a no-op                | The first selected-only payload omitted the live form's `lim` row count and `oldcost_N` prior-price fields, so Neopets returned normally without applying the reviewed price         | Hydrated stock is accepted only with complete object/prior/current field triplets. The worker-authored payload reindexes selected rows from one, includes the exact selected count and current-price guard, and the content client rejects missing, duplicate, mismatched, gapped, or out-of-range fields.                                                                   | The first submission left the exact row at 490 NP and was not retried blindly. Regression tests cover the contract; the repaired 490 NP → 1 NP update and 1 NP → 490 NP restoration both passed exact live verification. |
+| Consequential post-submit ambiguity mislabeled as failure | The catch path always wrote `failed`, even when the POST may have succeeded and only verification failed                                                                             | Both price and purchase operations track whether the mutation request started. Any later error records `uncertain`, releases short-lived state, warns against retry, and requires manual inspection.                                                                                                                                                                         | Mutation-classification tests; UI/status source review.                                                                                                                                                                  |
+| Auto-buy contract absent                                  | The prior release intentionally had no purchase code despite the production objective requiring guarded behavior and coverage                                                        | Added an independent disabled/dry-run default, one-item-only workflow with exact candidate schema, hard ceiling, fresh Wizard recheck, response hash, short token, global lock, one-way 24-hour duplicate key, one request, no retry, and strict response verification.                                                                                                      | Maximum, schema, URL, visible price, dedup, lock, stale, response, settings, sender/page tests plus authenticated read-only live contract validation.                                                                    |
 
 ### Medium
 
@@ -295,25 +296,32 @@ Completed without mutation or sensitive capture:
 - The first authorized real-price attempt stopped before POST when the extension-origin worker's
   fresh-stock GET lacked the signed-in page context. Later content-context GETs were authenticated
   but returned a stock-page shell with zero rows; a normal same-origin frame hydrated eight rows.
-  The bounded frame loader now waits for paired fields, enforces the 2 MB cap and timeout, removes
-  itself deterministically, and feeds the unchanged strict parser. The price endpoint remains the
-  exact live `/process_market.phtml` form action. The controlled mutation retest remains pending
-  action-time confirmation.
+  The bounded frame loader now waits for complete object/prior/current-price triplets, enforces the
+  2 MB cap and timeout, removes itself deterministically, and feeds the unchanged strict parser. The
+  price endpoint remains the exact live `/process_market.phtml` form action.
 - Two later authorized attempts exposed that excluded rows still entered a one-item plan and failed
   the fresh gate before POST; the selected price remained 490 NP. The selected-only repair was
   rebuilt and reloaded. A three-row dry scan changed its review action from three to one as the two
   unrelated rows were deselected, and its dialog contained only the 490 NP → 1 NP row. Finishing the
-  dry run submitted no price. The real selected-only review remains action-time gated.
+  dry run submitted no price.
 - A read-only network/DOM comparison then proved that authenticated programmatic stock GETs return
   only a page shell: HTTP 200, account and form chrome, but zero paired rows. A normal hidden
   same-origin frame running Neopets' page scripts hydrated all eight stock rows. The repaired frame
-  loader and three cleanup/size regressions are in the 74-test build. Its installed eight-row scan
-  completed with eight validated suggestions; excluding seven produced the exact one-row real
-  review, which remains unsubmitted while action-time confirmation is pending.
+  loader and cleanup/size regressions are in the 74-test build. Its installed eight-row scan
+  completed with eight validated suggestions; excluding seven produced the exact one-row review.
+- The user authorized a reversible low-value 490 NP → 1 NP → 490 NP validation. The initial
+  selected-only POST returned without the extension's success marker, so the exact row was reloaded
+  before any retry and remained 490 NP. Live form tracing isolated the missing `lim` and `oldcost_N`
+  contract. The repaired payload reindexed the selected row from one, included the row count and 490
+  NP prior-price guard, and then reported exactly one verified price change. Reloading the stock
+  page independently showed 1 NP. A fresh scan prepared only the inverse 1 NP → 490 NP restoration;
+  the one-shot POST again verified exactly one change, and a final reload showed 490 NP. Auto
+  Pricing was restored to disabled, dry run enabled, undercut by 1,000 NP, floor 1, maximum 10, and
+  an 8-second interval; a reload verified every value persisted.
 
 No username, balance, shop name, third-party owner, object ID, raw page HTML, cookie, token, auth
-header, browser profile, or account screenshot was saved or committed. No shop form or purchase URL
-was submitted.
+header, browser profile, or account screenshot was saved or committed. Only the controlled one-item
+shop price update and its restoration were submitted; no purchase URL was followed.
 
 Early `dist/` builds were manually reloaded because Chrome browser automation correctly rejects
 `chrome://extensions/`. Computer Use later invoked the visible extension reload control at the
@@ -324,10 +332,10 @@ Windows input was issued. No privileged-URL bypass or profile manipulation was u
 
 ## Remaining limitations and required follow-up
 
-1. **Controlled live mutations remain action-time gated.** The repaired one-item pricing dry run
-   passed and settings were restored. A single low-value purchase and a single low-value price
-   update/restoration remain limited to unambiguous identity, price, response, and restoration
-   checks, with confirmation immediately before each action.
+1. **The controlled purchase remains action-time gated.** The one-item pricing mutation and exact
+   restoration passed with safe settings restored. A single low-value purchase remains limited to
+   unambiguous identity, price, and response checks, with confirmation immediately before the
+   purchase.
 2. **Live markup can change.** Parsers fail closed, but maintainers must update bounded selectors
    and fixtures after verified site changes.
 3. **Purchase response wording is intentionally strict.** Unknown success wording produces
@@ -344,4 +352,4 @@ Windows input was issued. No privileged-URL bypass or profile manipulation was u
    settings to provide a direct private intake.
 
 No unresolved source-level critical, high, or medium defect identified by this audit remains open.
-The action-time-gated live mutations above remain release gates, not claims of completion.
+The action-time-gated purchase above remains a release gate, not a claim of completion.

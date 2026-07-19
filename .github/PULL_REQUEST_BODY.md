@@ -148,7 +148,7 @@ checks, and POST fields only to explicitly selected changed rows, so unrelated s
 be rewritten by a one-item update. The review action count also follows checkbox selections. The
 reloaded installed build passed a three-row dry scan: deselecting two rows changed the review action
 from three to one, the dialog contained only the selected 490 NP → 1 NP row, and completion
-submitted no price. The selected-only real review remains action-time gated.
+submitted no price.
 
 The next real attempt isolated a final Neopets transport detail: authenticated programmatic stock
 GETs return only a shell, while the site's own scripts hydrate the actual rows. Auto Pricing now
@@ -156,7 +156,17 @@ uses a bounded hidden same-origin frame for fresh and post-submit snapshots, wai
 paired form fields, enforces the response cap/deadline, and always removes the frame. Client tests
 cover hydration success, timeout cleanup, and oversized pages. The installed eight-row scan then
 completed with eight validated suggestions; seven rows were excluded and the exact one-row review
-remains unsubmitted pending action-time confirmation.
+was authorized.
+
+That first selected-only POST returned without changing the exact 490 NP row, so the extension did
+not retry it. Live form tracing found that the request also requires `lim` plus matching
+`obj_id_N`/`oldcost_N`/`cost_N` triplets. The repaired worker payload contiguously reindexes only
+selected rows, includes their current price as the stale-write guard, and the content client rejects
+incomplete, duplicate, mismatched, or gapped fields. The rebuilt installed extension then verified
+the exact 490 NP → 1 NP update, independently read 1 NP after reload, verified the inverse 1 NP →
+490 NP restoration, and independently read 490 NP after reload. Disabled/dry-run/undercut-1,000/
+floor-1/10-item/8-second settings were restored and persisted. No unrelated row changed and no
+account-private evidence was saved.
 
 The final manual unpacked-extension reload also exposed Chrome's stale-content
 `Extension context invalidated` rejection. The repaired save boundary now removes that disconnected
