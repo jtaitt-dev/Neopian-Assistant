@@ -28,6 +28,7 @@ const purchaseCandidate = {
 const hydratedShopHtml = `<!doctype html><html><body>
   <form action="/process_market.phtml">
     <input name="obj_id_1" value="123456">
+    <input name="oldcost_1" value="999">
     <input name="cost_1" value="999">
   </form>
 </body></html>`;
@@ -86,7 +87,7 @@ function hydrationHarness({
 
 test("content shop client submits only a validated worker-authored update payload", async () => {
   let request;
-  const payload = "type=update_prices&obj_id_1=123456&cost_1=999";
+  const payload = "type=update_prices&lim=1&obj_id_1=123456&oldcost_1=1000&cost_1=999";
   await submitShopUpdate(payload, {
     fetchImplementation: async (url, options) => {
       request = { url, options };
@@ -100,6 +101,12 @@ test("content shop client submits only a validated worker-authored update payloa
   assert.equal(request.options.redirect, "follow");
   await assert.rejects(
     submitShopUpdate("type=update_prices&next=https%3A%2F%2Fevil.example", {
+      fetchImplementation: async () => response(),
+    }),
+    /payload is invalid/i,
+  );
+  await assert.rejects(
+    submitShopUpdate("type=update_prices&lim=1&obj_id_1=123456&cost_1=999", {
       fetchImplementation: async () => response(),
     }),
     /payload is invalid/i,
@@ -126,7 +133,7 @@ test("content purchase client follows only an exact validated listing once", asy
 
 test("content shop client rejects oversized authenticated responses", async () => {
   await assert.rejects(
-    submitShopUpdate("type=update_prices&obj_id_1=123456&cost_1=999", {
+    submitShopUpdate("type=update_prices&lim=1&obj_id_1=123456&oldcost_1=1000&cost_1=999", {
       fetchImplementation: async () => response({ contentLength: "2000001" }),
     }),
     /safe size limit/i,
@@ -159,6 +166,7 @@ test("content shop client waits for a same-origin hydrated stock form and remove
     serializeImplementation,
   });
   assert.match(html, /obj_id_1/);
+  assert.match(html, /oldcost_1/);
   assert.match(html, /cost_1/);
   assert.equal(frame.src, "https://www.neopets.com/market.phtml?type=your");
   assert.equal(frame.hidden, true);

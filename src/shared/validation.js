@@ -250,6 +250,7 @@ export function sanitizeShopRow(raw) {
     !SHOP_FIELD_PATTERN.test(priceField) ||
     !objectIdField.startsWith("obj_id_") ||
     !priceField.startsWith("cost_") ||
+    objectIdField.slice("obj_id_".length) !== priceField.slice("cost_".length) ||
     currentPrice === null ||
     proposedPrice === null
   ) {

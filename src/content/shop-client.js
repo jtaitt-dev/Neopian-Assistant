@@ -42,13 +42,21 @@ function inspectHydratedShopFrame(frame, serializeImplementation) {
   const form = documentObject.querySelector("form[action*='process_market.phtml']");
   if (!form) return null;
   const objectFields = [...form.querySelectorAll("input[name^='obj_id_']")];
+  const priorPriceFields = [...form.querySelectorAll("input[name^='oldcost_']")];
   const priceFields = [...form.querySelectorAll("input[name^='cost_']")];
   if (objectFields.length === 0 || objectFields.length > SHOP_LIMITS.maxShopRows) return null;
+  const priorPriceNames = new Set(priorPriceFields.map((field) => field.name));
   const priceNames = new Set(priceFields.map((field) => field.name));
-  const pairedRows = objectFields.filter((field) =>
-    priceNames.has(`cost_${field.name.slice("obj_id_".length)}`),
+  const pairedRows = objectFields.filter(
+    (field) =>
+      priorPriceNames.has(`oldcost_${field.name.slice("obj_id_".length)}`) &&
+      priceNames.has(`cost_${field.name.slice("obj_id_".length)}`),
   );
-  if (pairedRows.length !== objectFields.length || pairedRows.length !== priceFields.length) {
+  if (
+    pairedRows.length !== objectFields.length ||
+    pairedRows.length !== priorPriceFields.length ||
+    pairedRows.length !== priceFields.length
+  ) {
     return null;
   }
 
@@ -106,19 +114,25 @@ async function fetchAuthenticatedHtml({
 function validateShopUpdatePayload(payload) {
   if (typeof payload !== "string" || payload.length === 0 || payload.length > 50_000) return false;
   const entries = [...new URLSearchParams(payload).entries()];
-  if (entries.length < 3 || entries.length > SHOP_LIMITS.maxShopRows * 2 + 1) return false;
+  if (entries.length < 5 || entries.length > SHOP_LIMITS.maxShopRows * 3 + 2) return false;
   const typeEntries = entries.filter(([key]) => key === "type");
   if (typeEntries.length !== 1 || typeEntries[0][1] !== "update_prices") return false;
+  const limitEntries = entries.filter(([key]) => key === "lim");
+  if (limitEntries.length !== 1 || !/^\d{1,3}$/.test(limitEntries[0][1])) return false;
+  const limit = Number(limitEntries[0][1]);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > SHOP_LIMITS.maxShopRows) return false;
   const objectIndexes = new Set();
+  const priorPriceIndexes = new Set();
   const priceIndexes = new Set();
   const keys = new Set();
   for (const [key, value] of entries) {
     if (keys.has(key)) return false;
     keys.add(key);
-    if (key === "type") continue;
+    if (key === "type" || key === "lim") continue;
     const objectMatch = /^obj_id_(\d{1,6})$/.exec(key);
+    const priorPriceMatch = /^oldcost_(\d{1,6})$/.exec(key);
     const priceMatch = /^cost_(\d{1,6})$/.exec(key);
-    if (!objectMatch && !priceMatch) return false;
+    if (!objectMatch && !priorPriceMatch && !priceMatch) return false;
     if (objectMatch) {
       if (!/^\d{1,16}$/.test(value)) return false;
       objectIndexes.add(objectMatch[1]);
@@ -127,12 +141,21 @@ function validateShopUpdatePayload(payload) {
     if (!/^\d{1,6}$/.test(value)) return false;
     const price = Number(value);
     if (!Number.isSafeInteger(price) || price < 0 || price > SHOP_LIMITS.maxPrice) return false;
-    priceIndexes.add(priceMatch[1]);
+    if (priorPriceMatch) priorPriceIndexes.add(priorPriceMatch[1]);
+    else priceIndexes.add(priceMatch[1]);
   }
   return (
-    objectIndexes.size > 0 &&
+    objectIndexes.size === limit &&
+    priorPriceIndexes.size === limit &&
+    priceIndexes.size === limit &&
     objectIndexes.size === priceIndexes.size &&
-    [...objectIndexes].every((index) => priceIndexes.has(index))
+    [...objectIndexes].every(
+      (index) =>
+        Number(index) >= 1 &&
+        Number(index) <= limit &&
+        priorPriceIndexes.has(index) &&
+        priceIndexes.has(index),
+    )
   );
 }
 

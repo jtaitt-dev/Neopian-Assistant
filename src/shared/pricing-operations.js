@@ -81,10 +81,16 @@ export function createWizardRequestOptions(itemName) {
 }
 
 export function createShopUpdatePayload(rows) {
-  const parameters = new URLSearchParams({ type: "update_prices" });
-  for (const row of rows.filter((entry) => entry.include === true)) {
-    parameters.set(row.objectIdField, row.id);
-    parameters.set(row.priceField, String(row.proposedPrice));
+  const selectedRows = rows.filter((entry) => entry.include === true);
+  const parameters = new URLSearchParams({
+    type: "update_prices",
+    lim: String(selectedRows.length),
+  });
+  for (const [index, row] of selectedRows.entries()) {
+    const requestIndex = index + 1;
+    parameters.set(`obj_id_${requestIndex}`, row.id);
+    parameters.set(`oldcost_${requestIndex}`, String(row.currentPrice));
+    parameters.set(`cost_${requestIndex}`, String(row.proposedPrice));
   }
   return parameters.toString();
 }

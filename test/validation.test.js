@@ -196,5 +196,6 @@ test("shop row validation rejects invalid identifiers, fields, and prices", () =
   assert.equal(row.proposedPrice, 99);
   assert.equal(sanitizeShopRow({ ...row, id: "1&cost_2=1" }), null);
   assert.equal(sanitizeShopRow({ ...row, priceField: "sale_1" }), null);
+  assert.equal(sanitizeShopRow({ ...row, priceField: "cost_2" }), null);
   assert.equal(sanitizeShopRow({ ...row, proposedPrice: 1_000_000 }), null);
 });

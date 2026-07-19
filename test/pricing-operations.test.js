@@ -80,11 +80,17 @@ test("fixed endpoint payload builders encode names and omit unselected prices", 
   assert.equal(wizard.get("criteria"), "exact");
   const update = new URLSearchParams(
     createShopUpdatePayload([
-      row,
+      { ...row, objectIdField: "obj_id_8", priceField: "cost_8" },
       { ...row, id: "456", objectIdField: "obj_id_2", priceField: "cost_2", include: false },
     ]),
   );
+  assert.equal(update.get("lim"), "1");
+  assert.equal(update.get("obj_id_1"), row.id);
+  assert.equal(update.get("oldcost_1"), String(row.currentPrice));
   assert.equal(update.get("cost_1"), "999");
+  assert.equal(update.get("obj_id_8"), null);
+  assert.equal(update.get("oldcost_8"), null);
+  assert.equal(update.get("cost_8"), null);
   assert.equal(update.get("obj_id_2"), null);
   assert.equal(update.get("cost_2"), null);
 });
