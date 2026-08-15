@@ -2,19 +2,19 @@
 
 Evidence date: 2026-08-15
 
-Current production build: Neopian Assistant 7.12.0 (`dist/`)
+Current production build: Neopian Assistant 7.13.0 (`dist/`)
 
-Current release package: `release/neopian-assistant-7.12.0.zip`
+Current release package: `release/neopian-assistant-7.13.0.zip`
 
 ## Automated validation
 
-The current 7.12.0 build passed:
+The current 7.13.0 build passed:
 
 - Prettier formatting verification.
 - Biome lint with no warnings.
-- 92 Node behavioral tests, 92 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 71.14% aggregate line coverage, 76.17% branch coverage, and 75.65%
-  function coverage; UI surfaces also require installed-browser validation.
+- 95 Node behavioral tests, 95 passed, 0 failed, 0 skipped.
+- `node --test --experimental-test-coverage`: 71.72% aggregate line coverage, 75.51% branch
+  coverage, and 76.20% function coverage; UI surfaces also require installed-browser validation.
 - Syntax checking of every source JavaScript file.
 - esbuild production build.
 - Manifest V3, file-reference, icon-dimension/alpha, CSP-safe HTML, branding/version, unsafe-API,
@@ -22,15 +22,16 @@ The current 7.12.0 build passed:
 - Repository secret scan with no credential-shaped values, sensitive filenames, or private local
   paths.
 - `npm audit --audit-level=high` with 0 vulnerabilities.
-- Deterministic 21-file release packaging: 95,993 bytes, SHA-256
-  `647CCDDC8B31213ABF0AEF2010D176595219BA70EFE929FABD581BD639A10AE3` on two consecutive runs.
+- Deterministic 21-file release packaging: 101,011 bytes, SHA-256
+  `850F2AB09E0D55B5FC8A1222C3C22A130AFA9790B4D373092A87D81E893AD1EF` on two consecutive runs.
 
 The expanded suite covers price parsing/limits/verification, fresh shop state, partial-result
 classification, purchase maximums/item/URL identity/visible price/fingerprint/duplicate window/
-locks/response verification, 10-item MS/SW Autobuy watchlist normalization/authorization/dynamic
-rendering/parser behavior, exact Kauvara card and haggle-URL validation, sender/page validation,
-daily timezone resets, disabled-startup reactivation, storage defaults/migration/corruption,
-timeouts/abort, Manifest references, branding, and branch policy.
+locks/response verification, 100-item MS and 10-item SW Autobuy watchlist normalization,
+authorization, dynamic rendering/parser behavior, exact Kauvara card/haggle-form/result validation,
+tab-bound purchase phases, exact listed-price submission, sender/page validation, daily timezone
+resets, disabled-startup reactivation, storage defaults/migration/corruption, timeouts/abort,
+Manifest references, branding, and branch policy.
 
 ## Prior clean-profile installed-build evidence
 
@@ -228,7 +229,7 @@ preserved the claim and displayed **Claimed · available in 10h 23m**, demonstra
 persistence and a live countdown to the next Neopian daily boundary. No account identity, balance,
 reward details, token, raw page HTML, or screenshot was saved.
 
-## Current 7.12.0 MS Autobuy installed-build evidence
+## Prior 7.12.0 MS Autobuy installed-build evidence
 
 The bounded reload helper rebuilt and loaded the unpacked extension, required one exact extension
 card, and verified version 7.12.0. On the exact authenticated Kauvara URL, the installed dashboard:
@@ -257,6 +258,35 @@ purchase was submitted during live validation. Human verification remains manual
 clicked, solved, bypassed, or represented as verified by the extension. The two current screenshots
 were cropped to the extension root; they contain no account identity, balance, cookie, token,
 object/stock ID, raw response, or browser-profile data.
+
+## Current 7.13.0 MS Autobuy installed-build evidence
+
+The unpacked extension was rebuilt from `dist/`, reloaded through Chrome's visible extension
+control, and Chrome's details page confirmed version 7.13.0 from
+`~/Downloads/Neopets-Dailies-OS/dist`. On the exact authenticated Kauvara URL, the installed build:
+
+- Mounted one dashboard with the exact **MS Autobuy** tab label; Auto Pricing and SW Autobuy
+  remained separate tabs.
+- Displayed a 100-name exact Kauvara watchlist, no MS price-ceiling control, an 8–60 second bounded
+  interval, disabled-by-default enablement, and dry run enabled by default.
+- Saved one temporary exact `Nova` watchlist entry, parsed the current 330 NP/5-stock card, and ran
+  one sequential authenticated dry-run check.
+- Stopped on that exact match, opened the extension's quantity-one **Review MS dry run** dialog, and
+  showed the exact live item, price, and stock.
+- Required the extension acknowledgement, completed with no purchase or haggle request, stayed on
+  `https://www.neopets.com/objects.phtml?obj_type=2&type=shop`, and opened no official purchase
+  confirmation.
+- Was restored to MS Autobuy disabled, dry run enabled, a 10-second interval, and an empty
+  watchlist.
+
+No live MS purchase was attempted in this v7.13.0 smoke. The consequential continuation is covered
+by deterministic fixtures and tests that bind the exact card, tab, short-lived state transitions,
+token-bearing haggle URL, single listed-price form submission, strict dual-message success result,
+24-hour duplicate guard, and no-retry behavior. The extension never inspects, clicks, solves, or
+bypasses the official verification control; it waits for the user to complete that step before the
+one authorized offer continues. Browser console output contained no Neopian Assistant warning or
+error. The observed messages came from the unrelated Grammarly extension and were excluded from
+Neopian Assistant console-health results.
 
 ## Remaining installed-build gate
 

@@ -25,6 +25,21 @@ test("message sender validation binds the extension ID, tab, and exact feature p
   assert.equal(validateExtensionSender(pricingSender, extensionId, "purchase"), false);
   assert.equal(validateExtensionSender(purchaseSender, extensionId, "purchase"), true);
   assert.equal(validateExtensionSender(mainShopSender, extensionId, "mainShop"), true);
+  assert.equal(validateExtensionSender(mainShopSender, extensionId, "mainShopPurchase"), true);
+  assert.equal(
+    validateExtensionSender(
+      {
+        id: extensionId,
+        tab: {
+          id: 3,
+          url: "https://www.neopets.com/haggle.phtml?obj_info_id=12345&stock_id=987654321&g=1&cf_token=opaque",
+        },
+      },
+      extensionId,
+      "mainShopPurchase",
+    ),
+    true,
+  );
   assert.equal(validateExtensionSender(purchaseSender, extensionId, "mainShop"), false);
   assert.equal(
     validateExtensionSender(

@@ -8,10 +8,11 @@ import {
 import {
   createMainShopFingerprint,
   isActiveMainShopLock,
-  isDuplicateMainShopHandoff,
+  isDuplicateMainShopPurchase,
+  isValidMainShopPurchaseTransition,
   redactMainShopRecord,
-  validateMainShopHandoffRequest,
   validateMainShopLookupRequest,
+  validateMainShopPurchaseRequest,
 } from "./shared/main-shop-operations.js";
 import {
   createPlanFingerprint,
@@ -33,7 +34,13 @@ import {
 import { validateExtensionSender } from "./shared/message-policy.js";
 import { collectExpiredRuntimeKeys } from "./shared/runtime-state.js";
 import { loadAppData } from "./shared/storage.js";
-import { isPlainObject, isValidUuid } from "./shared/validation.js";
+import {
+  isKauvaraHaggleUrl,
+  isKauvaraMagicShopUrl,
+  isPlainObject,
+  isValidUuid,
+  sanitizeMainShopCandidate,
+} from "./shared/validation.js";
 
 const RATE_KEY = "neopianAssistant.runtime.lookupRate";
 const LOCK_KEY = "neopianAssistant.runtime.applyLock";
@@ -44,12 +51,14 @@ const PURCHASE_REVIEW_PREFIX = "neopianAssistant.runtime.purchaseReview.";
 const PURCHASE_CONFIRMATION_PREFIX = "neopianAssistant.runtime.purchaseConfirmation.";
 const MAIN_SHOP_LOCK_KEY = "neopianAssistant.runtime.mainShopLock";
 const MAIN_SHOP_REVIEW_PREFIX = "neopianAssistant.runtime.mainShopReview.";
+const MAIN_SHOP_PURCHASE_PREFIX = "neopianAssistant.runtime.mainShopPurchase.";
 const EPHEMERAL_OPERATION_PREFIXES = Object.freeze([
   REVIEW_PREFIX,
   CONFIRMATION_PREFIX,
   PURCHASE_REVIEW_PREFIX,
   PURCHASE_CONFIRMATION_PREFIX,
   MAIN_SHOP_REVIEW_PREFIX,
+  MAIN_SHOP_PURCHASE_PREFIX,
 ]);
 
 const cancelledRuns = new Set();
@@ -80,6 +89,10 @@ function validatePurchaseSender(sender) {
 
 function validateMainShopSender(sender) {
   return validateExtensionSender(sender, chrome.runtime.id, "mainShop");
+}
+
+function validateMainShopPurchaseSender(sender) {
+  return validateExtensionSender(sender, chrome.runtime.id, "mainShopPurchase");
 }
 
 function validateNeopetsSender(sender) {
@@ -607,9 +620,9 @@ async function appendMainShopRecord(record) {
 }
 
 async function assertMainShopNotDuplicate(fingerprint) {
-  if (isDuplicateMainShopHandoff(await readMainShopHistory(), fingerprint)) {
+  if (isDuplicateMainShopPurchase(await readMainShopHistory(), fingerprint)) {
     throw userError(
-      "This exact Kauvara listing already opened recently. No duplicate haggle handoff was created.",
+      "This exact Kauvara listing already reached purchase submission recently. No duplicate purchase was created.",
     );
   }
 }
@@ -617,7 +630,7 @@ async function assertMainShopNotDuplicate(fingerprint) {
 async function acquireMainShopLock(operationId, tabId) {
   const stored = await chrome.storage.session.get(MAIN_SHOP_LOCK_KEY);
   if (isActiveMainShopLock(stored[MAIN_SHOP_LOCK_KEY])) {
-    throw userError("Another MS Autobuy handoff is already active in a different tab.");
+    throw userError("Another MS Autobuy purchase is already active in a different tab.");
   }
   await chrome.storage.session.set({
     [MAIN_SHOP_LOCK_KEY]: {
@@ -628,10 +641,10 @@ async function acquireMainShopLock(operationId, tabId) {
   });
 }
 
-async function prepareMainShopHandoff(message, sender) {
+async function prepareMainShopPurchase(message, sender) {
   const settings = await getMainShopSettings();
-  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before a haggle handoff.");
-  const validation = validateMainShopHandoffRequest(message, settings);
+  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before purchasing.");
+  const validation = validateMainShopPurchaseRequest(message, settings);
   if (!validation.valid) throw userError(validation.error);
   await pruneExpiredOperationState();
   const fingerprint = await createMainShopFingerprint(validation.candidate);
@@ -649,13 +662,13 @@ async function prepareMainShopHandoff(message, sender) {
   return { ok: true, reviewId };
 }
 
-async function confirmMainShopHandoff(message, sender) {
+async function confirmMainShopPurchase(message, sender) {
   if (!isValidUuid(message.reviewId) || !isTextFingerprint(message.responseFingerprint)) {
     throw userError("The fresh MS Autobuy review proof is invalid.");
   }
   const settings = await getMainShopSettings();
-  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before a haggle handoff.");
-  const validation = validateMainShopHandoffRequest(message, settings);
+  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before purchasing.");
+  const validation = validateMainShopPurchaseRequest(message, settings);
   if (!validation.valid) throw userError(validation.error);
   const fingerprint = await createMainShopFingerprint(validation.candidate);
   const reviewKey = `${MAIN_SHOP_REVIEW_PREFIX}${message.reviewId}`;
@@ -673,22 +686,164 @@ async function confirmMainShopHandoff(message, sender) {
   }
   await assertMainShopNotDuplicate(fingerprint);
   await acquireMainShopLock(validation.operationId, sender.tab.id);
+  const purchaseKey = `${MAIN_SHOP_PURCHASE_PREFIX}${sender.tab.id}`;
   try {
-    await appendMainShopRecord({
-      operationId: validation.operationId,
-      timestamp: Date.now(),
-      status: "opened",
-      fingerprint,
+    await chrome.storage.session.set({
+      [purchaseKey]: {
+        operationId: validation.operationId,
+        tabId: sender.tab.id,
+        candidate: validation.candidate,
+        candidateFingerprint: fingerprint,
+        phase: "awaiting-listing",
+        expiresAt: Date.now() + MAIN_SHOP_LIMITS.purchaseTtlMs,
+      },
     });
     await chrome.storage.session.remove(reviewKey);
-    return { ok: true, haggleUrl: validation.candidate.haggleUrl };
+    return { ok: true, purchaseArmed: true };
   } catch (error) {
     const lock = (await chrome.storage.session.get(MAIN_SHOP_LOCK_KEY))[MAIN_SHOP_LOCK_KEY];
     if (lock?.operationId === validation.operationId) {
       await chrome.storage.session.remove(MAIN_SHOP_LOCK_KEY);
     }
+    await chrome.storage.session.remove(purchaseKey).catch(() => undefined);
     throw error;
   }
+}
+
+function getMainShopPurchaseKey(tabId) {
+  return `${MAIN_SHOP_PURCHASE_PREFIX}${tabId}`;
+}
+
+function sanitizePendingMainShopPurchase(raw, tabId) {
+  if (
+    !isPlainObject(raw) ||
+    raw.tabId !== tabId ||
+    !isValidUuid(raw.operationId) ||
+    !["awaiting-listing", "awaiting-verification", "awaiting-haggle", "submitting"].includes(
+      raw.phase,
+    ) ||
+    !Number.isSafeInteger(raw.expiresAt) ||
+    raw.expiresAt <= Date.now() ||
+    !/^[a-f0-9]{64}$/.test(raw.candidateFingerprint)
+  ) {
+    return null;
+  }
+  const candidate = sanitizeMainShopCandidate(raw.candidate);
+  return candidate ? { ...raw, candidate } : null;
+}
+
+async function readPendingMainShopPurchase(tabId) {
+  const key = getMainShopPurchaseKey(tabId);
+  const stored = await chrome.storage.session.get(key);
+  return { key, pending: sanitizePendingMainShopPurchase(stored[key], tabId) };
+}
+
+async function releaseMainShopPurchase(operationId, tabId) {
+  const key = getMainShopPurchaseKey(tabId);
+  const stored = await chrome.storage.session.get([key, MAIN_SHOP_LOCK_KEY]);
+  const removals = [];
+  if (stored[key]?.operationId === operationId) removals.push(key);
+  if (stored[MAIN_SHOP_LOCK_KEY]?.operationId === operationId) removals.push(MAIN_SHOP_LOCK_KEY);
+  if (removals.length > 0) await chrome.storage.session.remove(removals);
+}
+
+async function getMainShopPurchase(sender) {
+  await pruneExpiredOperationState();
+  const { pending } = await readPendingMainShopPurchase(sender.tab.id);
+  const data = await loadAppData();
+  const settings = data.settings.mainShopBuy;
+  if (!data.settings.enabled || !settings.enabled || settings.dryRun) {
+    if (pending) await releaseMainShopPurchase(pending.operationId, sender.tab.id);
+    return { ok: true, pending: null };
+  }
+  if (!pending) return { ok: true, pending: null };
+  return {
+    ok: true,
+    pending: {
+      operationId: pending.operationId,
+      candidate: pending.candidate,
+      phase: pending.phase,
+    },
+  };
+}
+
+async function advanceMainShopPurchase(message, sender) {
+  if (
+    !isValidUuid(message.operationId) ||
+    message.pageVerified !== true ||
+    typeof message.nextPhase !== "string"
+  ) {
+    throw userError("The MS Autobuy purchase transition is invalid.");
+  }
+  const settings = await getMainShopSettings();
+  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before purchasing.");
+  const { key, pending } = await readPendingMainShopPurchase(sender.tab.id);
+  if (!pending || pending.operationId !== message.operationId) {
+    throw userError("The pending MS Autobuy purchase expired or no longer matches this tab.");
+  }
+  if (!isValidMainShopPurchaseTransition(pending.phase, message.nextPhase)) {
+    throw userError("The MS Autobuy purchase is no longer in the expected phase.");
+  }
+  const onShopPage = isKauvaraMagicShopUrl(sender.tab.url);
+  const onExactHagglePage = isKauvaraHaggleUrl(sender.tab.url, pending.candidate);
+  const hasVerificationToken =
+    onExactHagglePage && new URL(sender.tab.url).searchParams.has("cf_token");
+  if (
+    (["awaiting-verification", "awaiting-haggle"].includes(message.nextPhase) && !onShopPage) ||
+    (message.nextPhase === "submitting" && !hasVerificationToken)
+  ) {
+    throw userError("The current Neopets page does not match this MS Autobuy purchase phase.");
+  }
+  if (message.nextPhase === "submitting") {
+    await assertMainShopNotDuplicate(pending.candidateFingerprint);
+    await appendMainShopRecord({
+      operationId: pending.operationId,
+      timestamp: Date.now(),
+      status: "submitting",
+      fingerprint: pending.candidateFingerprint,
+    });
+  }
+  await chrome.storage.session.set({
+    [key]: {
+      ...pending,
+      phase: message.nextPhase,
+      expiresAt: Date.now() + MAIN_SHOP_LIMITS.purchaseTtlMs,
+    },
+  });
+  return {
+    ok: true,
+    phase: message.nextPhase,
+    ...(message.nextPhase === "submitting" ? { offer: pending.candidate.price } : {}),
+  };
+}
+
+async function completeMainShopPurchase(message, sender) {
+  if (
+    !isValidUuid(message.operationId) ||
+    !["verified", "failed", "uncertain"].includes(message.outcome)
+  ) {
+    throw userError("The MS Autobuy purchase result is invalid.");
+  }
+  const { pending } = await readPendingMainShopPurchase(sender.tab.id);
+  if (!pending || pending.operationId !== message.operationId) {
+    throw userError("The pending MS Autobuy purchase expired or no longer matches this tab.");
+  }
+  if (
+    ["verified", "uncertain"].includes(message.outcome) &&
+    (pending.phase !== "submitting" ||
+      !isKauvaraHaggleUrl(sender.tab.url, pending.candidate) ||
+      !new URL(sender.tab.url).searchParams.has("cf_token"))
+  ) {
+    throw userError("The MS Autobuy result does not match a submitted haggle offer.");
+  }
+  await appendMainShopRecord({
+    operationId: pending.operationId,
+    timestamp: Date.now(),
+    status: message.outcome,
+    fingerprint: pending.candidateFingerprint,
+  });
+  await releaseMainShopPurchase(pending.operationId, sender.tab.id);
+  return { ok: true };
 }
 
 async function routeMessage(message, sender) {
@@ -796,19 +951,41 @@ async function routeMessage(message, sender) {
     operationQueue = task.catch(() => undefined);
     return task;
   }
-  if (message.type === MESSAGE_TYPES.prepareMainShopHandoff) {
+  if (message.type === MESSAGE_TYPES.prepareMainShopPurchase) {
     if (!validateMainShopSender(sender)) {
-      throw userError("MS Autobuy handoffs are only allowed in Kauvara's Magic Shop.");
+      throw userError("MS Autobuy purchases are only allowed in Kauvara's Magic Shop.");
     }
-    const task = operationQueue.then(() => prepareMainShopHandoff(message, sender));
+    const task = operationQueue.then(() => prepareMainShopPurchase(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }
-  if (message.type === MESSAGE_TYPES.confirmMainShopHandoff) {
+  if (message.type === MESSAGE_TYPES.confirmMainShopPurchase) {
     if (!validateMainShopSender(sender)) {
-      throw userError("MS Autobuy handoffs are only allowed in Kauvara's Magic Shop.");
+      throw userError("MS Autobuy purchases are only allowed in Kauvara's Magic Shop.");
     }
-    const task = operationQueue.then(() => confirmMainShopHandoff(message, sender));
+    const task = operationQueue.then(() => confirmMainShopPurchase(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.getMainShopPurchase) {
+    if (!validateMainShopPurchaseSender(sender)) {
+      throw userError("MS Autobuy purchases are only allowed on the exact Kauvara flow.");
+    }
+    return getMainShopPurchase(sender);
+  }
+  if (message.type === MESSAGE_TYPES.advanceMainShopPurchase) {
+    if (!validateMainShopPurchaseSender(sender)) {
+      throw userError("MS Autobuy purchases are only allowed on the exact Kauvara flow.");
+    }
+    const task = operationQueue.then(() => advanceMainShopPurchase(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.completeMainShopPurchase) {
+    if (!validateMainShopPurchaseSender(sender)) {
+      throw userError("MS Autobuy purchases are only allowed on the exact Kauvara flow.");
+    }
+    const task = operationQueue.then(() => completeMainShopPurchase(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }

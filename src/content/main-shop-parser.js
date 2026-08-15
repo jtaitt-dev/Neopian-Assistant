@@ -113,7 +113,7 @@ export function verifyFreshMainShopCandidate(
     fresh: false,
     candidate: null,
     error: changed
-      ? "The Kauvara listing changed and the haggle handoff was stopped."
+      ? "The Kauvara listing changed and the purchase was stopped."
       : "The selected Kauvara listing sold out or is no longer available.",
   };
 }

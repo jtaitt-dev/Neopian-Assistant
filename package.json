@@ -1,6 +1,6 @@
 {
   "name": "neopian-assistant",
-  "version": "7.12.0",
+  "version": "7.13.0",
   "private": true,
   "description": "An unofficial Chrome extension providing dailies, pricing, shop, and productivity tools for Neopets.",
   "type": "module",

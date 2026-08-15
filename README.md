@@ -12,7 +12,7 @@ audited `https://www.neopets.com/*` origin.
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-Current extension version: **7.12.0**
+Current extension version: **7.13.0**
 
 Manifest version: **3**
 
@@ -26,9 +26,9 @@ Minimum Chrome version: **114**
 | Tracking   | Manual claim cooldown        | Stores a local claim time only after the user presses the separate check control.              | Extension data only                    |
 | Assistance | Shop Wizard price scan       | Reads validated prices at a conservative interval and prepares suggestions.                    | No                                     |
 | Automation | Reviewed Auto Pricing update | Sends one exact shop-price form after fresh-state validation and explicit confirmation.        | Yes—changes shop prices                |
-| Assistance | MS Autobuy live watchlist    | Monitors up to 10 exact names in Kauvara's Magic Shop while its dashboard tab is open.         | No                                     |
-| Assistance | MS Autobuy dry run           | Detects, fresh-checks, and reviews one Kauvara listing without opening its haggle page.        | No                                     |
-| Handoff    | Reviewed one-item MS Autobuy | Opens one exact fresh-bound haggle page; the user completes the offer and verification.        | No automatic purchase                  |
+| Assistance | MS Autobuy live watchlist    | Monitors up to 100 exact names in Kauvara's Magic Shop while its dashboard tab is open.        | No                                     |
+| Assistance | MS Autobuy dry run           | Detects, fresh-checks, and reviews one Kauvara listing without opening its purchase flow.      | No                                     |
+| Automation | One-item MS Autobuy          | After user verification, submits the exact listed price once and verifies the result.          | Yes—spends Neopoints and adds one item |
 | Assistance | SW Autobuy live watchlist    | Sequentially monitors up to 10 exact Shop Wizard names while its dashboard tab is open.        | No                                     |
 | Assistance | SW Autobuy dry run           | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
 | Automation | Reviewed one-item SW Autobuy | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
@@ -106,26 +106,31 @@ user is told to reload and inspect stock before any manual retry.
 ### MS Autobuy
 
 MS Autobuy replaces the former standalone Progress tab. It monitors only Kauvara's Magic Shop and
-stops at Neopets' official haggle and human-verification boundary.
+automates one exact listed-price purchase after the user completes Neopets' official verification.
 
 1. It is off by default and dry-run is on by default.
-2. Save up to 10 exact item names, set an 8–60 second interval, and set a hard listed-price ceiling
-   from 1 through 999,999 NP. The default ceiling is 10,000 NP.
-3. Open `https://www.neopets.com/objects.phtml?type=shop&obj_type=2` and select **Start
-   monitoring**. Monitoring is sequential, cancellable, and active only while the MS Autobuy
-   dashboard tab stays open.
+2. Save up to 100 exact item names and set an 8–60 second interval. MS Autobuy has no user price
+   ceiling: live mode uses any valid listed price from 1 through 999,999 NP.
+3. Open `https://www.neopets.com/objects.phtml?type=shop&obj_type=2` and select **Start dry-run
+   monitoring** or **Start automatic buying**. Monitoring is sequential, cancellable, and active
+   only while the MS Autobuy dashboard tab stays open.
 4. Every stock read is worker-authorized against the persisted watchlist and exact Kauvara page.
    Cards must have matching visible/data names, matching visible/data prices, positive stock, and an
    exact `haggle.phtml` URL containing only `obj_info_id`, `stock_id`, and `g`.
-5. The first eligible exact match stops monitoring and opens a quantity-one review. Dry run finishes
-   there without a runtime handoff or navigation.
-6. In real mode, explicit review authorizes one additional paced stock read. The same name, object,
-   stock record, price, positive stock, and exact URL must still match within a short-lived review.
-7. A one-way listing fingerprint, duplicate window, and cross-tab lock then authorize one exact
-   haggle-page navigation. There is no automatic retry.
-8. The user enters the offer and completes Neopets' human verification manually. Neopian Assistant
-   never submits the offer, clicks verification imagery, solves a CAPTCHA, or claims the purchase
-   succeeded.
+5. The first eligible exact match stops monitoring. Dry run opens a quantity-one review and ends
+   without navigation or a request.
+6. Live mode authorizes one additional paced stock read. The same name, object, stock record, price,
+   positive stock, and exact URL must still match within a short-lived review.
+7. A one-way listing fingerprint and cross-tab lock bind one pending purchase. The current shop page
+   reloads, the exact live card is checked again, and Neopian Assistant opens Neopets' official
+   purchase confirmation.
+8. The user completes Neopets' confirmation checkbox. Neopian Assistant does not inspect, click,
+   solve, or bypass that verification control.
+9. Once Neopets enables its Yes button, Neopian Assistant opens the exact token-bearing haggle page,
+   verifies the item and zero-offer form, enters the exact listed price, and submits once.
+10. Success requires both the exact accepted-offer message and the exact item-added-to-inventory
+    message. Failed or ambiguous results stop without an automatic retry; ambiguous results are
+    recorded as `uncertain`.
 
 ### SW Autobuy
 
@@ -164,7 +169,7 @@ inventory and is never treated as permission to retry.
 Dry run is the safe starting point for every shop workflow:
 
 - Auto Pricing performs lookups and shows the exact review without posting prices.
-- MS Autobuy reviews a current Kauvara listing without opening its haggle page.
+- MS Autobuy reviews a current Kauvara listing without opening its purchase flow.
 - SW Autobuy validates and reviews a listing without following its purchase URL.
 - Dry-run completion messages explicitly state that no mutation was submitted.
 
@@ -179,7 +184,8 @@ Dry run is the safe starting point for every shop workflow:
 - Short-lived SHA-256-bound reviews and confirmations.
 - Session-backed cross-tab locks that survive service-worker suspension.
 - Persistent hashed duplicate-purchase protection.
-- Exact Kauvara stock-card and haggle-URL validation with a manual human-verification boundary.
+- Exact Kauvara stock-card, token-bearing haggle-page, offer-form, and outcome validation with a
+  manual human-verification boundary.
 - Request deadlines, cancellation for price scans, conservative lookup spacing, and response-size
   caps.
 - No automatic retry for price changes or purchases.
@@ -190,12 +196,14 @@ Dry run is the safe starting point for every shop workflow:
 
 ## Screenshots
 
-The current dashboard images are sanitized installed-build captures. Older auxiliary images use
-synthetic fixture data. None contains account identity, balances, cookies, or session data.
+The dashboard images are sanitized v7.12 installed-build captures retained as historical visual
+evidence; the current v7.13 behavior is documented in `docs/TEST_EVIDENCE.md`. Older auxiliary
+images use synthetic fixture data. None contains account identity, balances, cookies, or session
+data.
 
 ![Dynamic dailies dashboard](docs/evidence/dashboard-dailies-7.12.png)
 
-![MS Autobuy watchlist](docs/evidence/ms-autobuy-7.12.png)
+![Prior v7.12 MS Autobuy watchlist](docs/evidence/ms-autobuy-7.12.png)
 
 ![Auto Pricing dry-run review](docs/evidence/auto-pricing-smoke.png)
 
@@ -205,7 +213,7 @@ synthetic fixture data. None contains account identity, balances, cookies, or se
 
 ## Install from a release package
 
-1. Obtain `neopian-assistant-7.12.0.zip` from the GitHub release assets.
+1. Obtain `neopian-assistant-7.13.0.zip` from the GitHub release assets.
 2. Extract the archive to a permanent local folder.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable **Developer mode**.
@@ -268,9 +276,10 @@ src/
     app.js                    Dashboard shell, dailies, and controller routing
     auto-pricing.js           Price-scan, fresh-review, confirmation, and verification UI
     auto-buy.js               Live watchlist, one-item dry run, and purchase review UI
-    main-shop-auto-buy.js     Kauvara monitor, exact review, and manual haggle handoff UI
-    main-shop-client.js       Fixed authenticated Kauvara stock/handoff transport
+    main-shop-auto-buy.js     100-name Kauvara monitor, dry run, and purchase arming UI
+    main-shop-client.js       Fixed authenticated Kauvara stock transport
     main-shop-parser.js       Strict Kauvara stock-card and exact haggle-URL parser
+    main-shop-purchase-flow.js Official confirmation wait, exact offer, and result verification
     shop-client.js            Fixed authenticated stock/update/purchase transport
     shop-parser.js            Bounded live-page and response parsers
   popup/                      Toolbar popup
@@ -363,12 +372,14 @@ retention behavior.
 ### MS Autobuy is unavailable
 
 - Use the exact Kauvara URL: `https://www.neopets.com/objects.phtml?type=shop&obj_type=2`.
-- Save 1–10 exact item names, enable MS Autobuy, and begin with dry run.
-- A listing must have positive stock and be at or below the configured maximum.
+- Save 1–100 exact item names, enable MS Autobuy, and begin with dry run.
+- A listing must have positive stock and an exact valid listed price; live mode has no user price
+  ceiling.
 - Keep the MS Autobuy tab open; switching tabs, navigating, or closing the dashboard stops it.
-- If a listing changes or sells out during review, begin a new monitor cycle. Do not force a stale
-  haggle URL.
-- Complete any offer and human verification yourself on Neopets' haggle page.
+- If a listing changes or sells out before confirmation, begin a new monitor cycle. Do not force a
+  stale haggle URL.
+- Complete Neopets' confirmation checkbox yourself. After that, the extension submits the exact
+  listed-price offer once and requires exact success messages.
 
 ### Shop Wizard asks you to wait
 
@@ -448,8 +459,9 @@ they contain no sensitive data.
   `uncertain`, blocks blind retry, and requires manual inspection.
 - SW Autobuy verifies the transaction response; duplicate items already in inventory make generic
   inventory-name checks insufficient as standalone proof.
-- MS Autobuy deliberately stops at the official haggle page. Final offer entry, human verification,
-  and purchase outcome remain manual and are not asserted by the extension.
+- MS Autobuy requires the user to complete Neopets' official verification. It then submits the exact
+  listed price once and verifies the accepted-offer and inventory messages; it never retries an
+  ambiguous submission.
 - The Chrome Web Store submission and review process is outside this repository release.
 - Neopets' current terms broadly restrict unauthorized automation. The repository owner states that
   Auto Pricing and official icon use have project-specific approval; that statement is not general

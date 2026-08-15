@@ -3,9 +3,10 @@ import test from "node:test";
 import {
   createMainShopFingerprint,
   isActiveMainShopLock,
-  isDuplicateMainShopHandoff,
-  validateMainShopHandoffRequest,
+  isDuplicateMainShopPurchase,
+  isValidMainShopPurchaseTransition,
   validateMainShopLookupRequest,
+  validateMainShopPurchaseRequest,
 } from "../src/shared/main-shop-operations.js";
 
 const operationId = "4b56a9ee-1432-4b39-a3fb-1df34b8a3e42";
@@ -20,7 +21,6 @@ const candidate = {
 const settings = {
   enabled: true,
   dryRun: false,
-  maximumPrice: 2000,
   watchlist: [candidate.itemName],
   requestIntervalMs: 10000,
 };
@@ -45,17 +45,17 @@ test("MS Autobuy lookup authorization binds the exact saved watchlist", () => {
   );
 });
 
-test("MS Autobuy handoffs require a watched exact item below the hard ceiling", () => {
-  assert.equal(validateMainShopHandoffRequest({ operationId, candidate }, settings).valid, true);
+test("MS Autobuy purchases require a watched exact item and accept any valid listed price", () => {
+  assert.equal(validateMainShopPurchaseRequest({ operationId, candidate }, settings).valid, true);
   assert.equal(
-    validateMainShopHandoffRequest(
-      { operationId, candidate: { ...candidate, price: 2001 } },
+    validateMainShopPurchaseRequest(
+      { operationId, candidate: { ...candidate, price: 999_999 } },
       settings,
     ).valid,
-    false,
+    true,
   );
   assert.equal(
-    validateMainShopHandoffRequest(
+    validateMainShopPurchaseRequest(
       {
         operationId,
         candidate: { ...candidate, haggleUrl: `${candidate.haggleUrl}&quantity=2` },
@@ -65,7 +65,7 @@ test("MS Autobuy handoffs require a watched exact item below the hard ceiling", 
     false,
   );
   assert.equal(
-    validateMainShopHandoffRequest(
+    validateMainShopPurchaseRequest(
       { operationId, candidate: { ...candidate, itemName: "Not Watched" } },
       settings,
     ).valid,
@@ -86,15 +86,15 @@ test("MS Autobuy fingerprints, duplicate windows, and locks are bounded", async 
   );
   const now = 2_000_000_000_000;
   assert.equal(
-    isDuplicateMainShopHandoff(
-      [{ fingerprint, status: "opened", timestamp: now - 1000 }],
+    isDuplicateMainShopPurchase(
+      [{ fingerprint, status: "verified", timestamp: now - 1000 }],
       fingerprint,
       now,
     ),
     true,
   );
   assert.equal(
-    isDuplicateMainShopHandoff(
+    isDuplicateMainShopPurchase(
       [{ fingerprint, status: "failed", timestamp: now - 1000 }],
       fingerprint,
       now,
@@ -103,4 +103,10 @@ test("MS Autobuy fingerprints, duplicate windows, and locks are bounded", async 
   );
   assert.equal(isActiveMainShopLock({ operationId, expiresAt: now + 1000 }, now), true);
   assert.equal(isActiveMainShopLock({ operationId, expiresAt: now }, now), false);
+  assert.equal(
+    isValidMainShopPurchaseTransition("awaiting-listing", "awaiting-verification"),
+    true,
+  );
+  assert.equal(isValidMainShopPurchaseTransition("awaiting-haggle", "submitting"), true);
+  assert.equal(isValidMainShopPurchaseTransition("submitting", "submitting"), false);
 });

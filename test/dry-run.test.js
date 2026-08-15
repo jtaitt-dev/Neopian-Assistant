@@ -109,7 +109,6 @@ test("MS Autobuy dry run sends no message and opens no haggle page", async () =>
           mainShopBuy: {
             enabled: true,
             dryRun: true,
-            maximumPrice: 2000,
             requestIntervalMs: 10000,
             watchlist: [mainShopCandidate.itemName],
           },
@@ -117,7 +116,7 @@ test("MS Autobuy dry run sends no message and opens no haggle page", async () =>
       },
       save: async () => undefined,
       announce: () => undefined,
-      haggleNavigator: () => {
+      purchaseLauncher: () => {
         navigations += 1;
       },
     });
@@ -130,7 +129,7 @@ test("MS Autobuy dry run sends no message and opens no haggle page", async () =>
     await confirmDialog(document, "Finish dry run");
     assert.equal(messages, 0);
     assert.equal(navigations, 0);
-    assert.match(controller.status.textContent, /No haggle page was opened/i);
+    assert.match(controller.status.textContent, /No purchase flow was opened/i);
   } finally {
     globalThis.document = previous.document;
     globalThis.window = previous.window;
@@ -163,7 +162,6 @@ test("MS Autobuy stops on a live eligible match and opens one exact review", asy
           mainShopBuy: {
             enabled: true,
             dryRun: true,
-            maximumPrice: 2000,
             requestIntervalMs: 10000,
             watchlist: [mainShopCandidate.itemName],
           },
@@ -190,6 +188,81 @@ test("MS Autobuy stops on a live eligible match and opens one exact review", asy
     assert.match(controller.dialog.textContent, /Test Healing Potion/);
     assert.match(controller.status.textContent, /Monitoring stopped for exact review/i);
     controller.cleanup();
+  } finally {
+    globalThis.chrome = previous.chrome;
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+    globalThis.Node = previous.Node;
+    globalThis.DOMParser = previous.DOMParser;
+  }
+});
+
+test("MS Autobuy live monitoring arms one exact purchase without a price ceiling", async () => {
+  const previous = {
+    chrome: globalThis.chrome,
+    document: globalThis.document,
+    window: globalThis.window,
+    Node: globalThis.Node,
+    DOMParser: globalThis.DOMParser,
+  };
+  const dom = installDom();
+  globalThis.document = dom.document;
+  globalThis.window = dom.window;
+  globalThis.Node = dom.window.Node;
+  globalThis.DOMParser = dom.window.DOMParser;
+  Object.defineProperty(globalThis.window, "location", {
+    configurable: true,
+    value: { href: "https://www.neopets.com/objects.phtml?type=shop&obj_type=2" },
+  });
+  globalThis.chrome = { runtime: { sendMessage: async () => ({ ok: true }) } };
+  const messages = [];
+  let launches = 0;
+  try {
+    const controller = new MainShopAutoBuyController({
+      data: {
+        settings: {
+          mainShopBuy: {
+            enabled: true,
+            dryRun: false,
+            requestIntervalMs: 10000,
+            watchlist: [mainShopCandidate.itemName],
+          },
+        },
+      },
+      save: async () => undefined,
+      announce: () => undefined,
+      shopFetcher: async () => matchingMainShopHtml,
+      purchaseLauncher: () => {
+        launches += 1;
+      },
+    });
+    controller.send = async (message) => {
+      messages.push(message.type);
+      if (message.type === "mainShop.authorizeLookup") {
+        return { ok: true, watchlistCount: 1 };
+      }
+      if (message.type === "mainShop.preparePurchase") {
+        return { ok: true, reviewId: crypto.randomUUID() };
+      }
+      if (message.type === "mainShop.confirmPurchase") {
+        return { ok: true, purchaseArmed: true };
+      }
+      return { ok: true };
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    controller.render(container);
+    controller.startMonitoring();
+    for (let attempt = 0; attempt < 5 && launches === 0; attempt += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(launches, 1);
+    assert.equal(controller.monitoring, false);
+    assert.equal(controller.dialog, null);
+    assert.deepEqual(
+      messages.filter((type) => type !== "mainShop.cancelMonitor"),
+      ["mainShop.authorizeLookup", "mainShop.preparePurchase", "mainShop.confirmPurchase"],
+    );
   } finally {
     globalThis.chrome = previous.chrome;
     globalThis.document = previous.document;
