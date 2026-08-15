@@ -2,7 +2,7 @@ import { MAIN_SHOP_LIMITS, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constant
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { createTextFingerprint } from "../shared/pricing-operations.js";
 import { isKauvaraMagicShopUrl, sanitizeMainShopWatchlist } from "../shared/validation.js";
-import { fetchMagicShopHtml, openKauvaraHagglePage } from "./main-shop-client.js";
+import { fetchMagicShopHtml } from "./main-shop-client.js";
 import {
   extractMainShopCandidates,
   getMagicShopUrl,
@@ -24,13 +24,13 @@ export class MainShopAutoBuyController {
     save,
     announce,
     shopFetcher = fetchMagicShopHtml,
-    haggleNavigator = openKauvaraHagglePage,
+    purchaseLauncher = () => globalThis.location.reload(),
   }) {
     this.data = data;
     this.save = save;
     this.announce = announce;
     this.shopFetcher = shopFetcher;
-    this.haggleNavigator = haggleNavigator;
+    this.purchaseLauncher = purchaseLauncher;
     this.status = null;
     this.dialog = null;
     this.monitoring = false;
@@ -40,6 +40,7 @@ export class MainShopAutoBuyController {
     this.monitorResultsRoot = null;
     this.monitorStartButton = null;
     this.monitorStopButton = null;
+    this.purchaseArming = false;
   }
 
   get settings() {
@@ -74,23 +75,6 @@ export class MainShopAutoBuyController {
     dryRun.addEventListener("change", async () => {
       this.settings.dryRun = dryRun.checked;
       await this.saveSettings("MS Autobuy settings saved.");
-      this.render(container);
-    });
-    const maximumPrice = element("input", {
-      type: "number",
-      min: 1,
-      max: MAIN_SHOP_LIMITS.absoluteMaximumPrice,
-      step: 1,
-      inputMode: "numeric",
-      value: this.settings.maximumPrice,
-    });
-    maximumPrice.addEventListener("change", async () => {
-      this.settings.maximumPrice = Math.min(
-        MAIN_SHOP_LIMITS.absoluteMaximumPrice,
-        Math.max(1, Number.parseInt(maximumPrice.value, 10) || 1),
-      );
-      maximumPrice.value = this.settings.maximumPrice;
-      await this.saveSettings("MS Autobuy purchase limit saved.");
       this.render(container);
     });
     const requestInterval = element("input", {
@@ -162,7 +146,7 @@ export class MainShopAutoBuyController {
         element("div", {}, [
           element("strong", { text: "Enable MS Autobuy" }),
           element("span", {
-            text: "Off by default. Watches only Kauvara's Magic Shop and opens one exact haggle handoff.",
+            text: "Off by default. Watches only Kauvara's Magic Shop and arms one exact listed-price purchase.",
           }),
         ]),
         element("label", { className: "na-switch", ariaLabel: "Enable MS Autobuy" }, [
@@ -174,7 +158,7 @@ export class MainShopAutoBuyController {
         element("div", {}, [
           element("strong", { text: "Dry run" }),
           element("span", {
-            text: "Detect and review a live match without leaving the shop page.",
+            text: "Detect and review a live match without opening the official purchase flow.",
           }),
         ]),
         element("label", { className: "na-switch", ariaLabel: "Use MS Autobuy dry-run mode" }, [
@@ -183,11 +167,6 @@ export class MainShopAutoBuyController {
         ]),
       ]),
       element("div", { className: "na-field-grid" }, [
-        labeledControl(
-          "Maximum listed price (NP)",
-          maximumPrice,
-          "A hard ceiling before a haggle page can be opened.",
-        ),
         labeledControl(
           "Seconds between stock checks",
           requestInterval,
@@ -212,7 +191,7 @@ export class MainShopAutoBuyController {
       role: "status",
       ariaLive: "polite",
       text: this.settings.enabled
-        ? "Ready. A match must pass a fresh stock check before its haggle page can open."
+        ? "Ready. A match must pass a fresh stock check before one purchase can be armed."
         : "MS Autobuy is disabled.",
     });
     this.monitorStartButton = element(
@@ -224,7 +203,10 @@ export class MainShopAutoBuyController {
           !this.settings.enabled || !onMagicShopPage || this.settings.watchlist.length === 0,
         onClick: () => this.startMonitoring(),
       },
-      [icon("search"), "Start monitoring"],
+      [
+        icon("search"),
+        this.settings.dryRun ? "Start dry-run monitoring" : "Start automatic buying",
+      ],
     );
     this.monitorStopButton = element(
       "button",
@@ -244,7 +226,7 @@ export class MainShopAutoBuyController {
         element("div", {}, [
           element("h2", { text: "MS Autobuy" }),
           element("p", {
-            text: "A live 10-item Kauvara watchlist with exact-name matching, a hard price ceiling, fresh-stock binding, and one safe haggle handoff.",
+            text: "A live 100-item Kauvara watchlist with exact-name matching, fresh-stock binding, and one exact listed-price purchase per run.",
           }),
         ]),
       ]),
@@ -252,7 +234,7 @@ export class MainShopAutoBuyController {
       element("div", { className: "na-notice na-notice--warning" }, [
         icon("info"),
         element("p", {
-          text: "Neopets requires the final offer and human verification on its haggle page. Neopian Assistant does not solve, click, or bypass that verification.",
+          text: "Live mode accepts any valid listed price. When a match appears, complete Neopets' confirmation checkbox yourself; Neopian Assistant then submits that exact listed price once and verifies the result. It does not solve or bypass verification.",
         }),
       ]),
       ...(!onMagicShopPage
@@ -275,7 +257,7 @@ export class MainShopAutoBuyController {
       element("div", { className: "na-notice" }, [
         icon("shield"),
         element("p", {
-          text: "Monitoring is read-only, sequential, and active only while this dashboard tab remains open. An eligible match stops the monitor and opens an exact review.",
+          text: "Monitoring is sequential and active only while this dashboard tab remains open. The first eligible match stops monitoring, binds one exact item, and never retries an offer automatically.",
         }),
       ]),
       this.monitorResultsRoot,
@@ -291,11 +273,7 @@ export class MainShopAutoBuyController {
       const candidate = matches[0] ?? null;
       this.monitorResults.set(
         itemName,
-        !candidate
-          ? { state: "not-found" }
-          : candidate.price <= this.settings.maximumPrice
-            ? { state: "ready", candidate }
-            : { state: "above-limit", candidate },
+        !candidate ? { state: "not-found" } : { state: "ready", candidate },
       );
     }
     this.renderMonitorResults();
@@ -330,10 +308,7 @@ export class MainShopAutoBuyController {
       if (result.state === "not-found") detail = "Not present in the latest stock page.";
       if (result.state === "error") detail = result.error;
       if (result.state === "ready") {
-        detail = `${formatPrice(result.candidate.price)} · ${result.candidate.stock} in stock · Ready to review.`;
-      }
-      if (result.state === "above-limit") {
-        detail = `${formatPrice(result.candidate.price)} · Above the ${formatPrice(this.settings.maximumPrice)} limit.`;
+        detail = `${formatPrice(result.candidate.price)} · ${result.candidate.stock} in stock · ${this.settings.dryRun ? "Ready to review." : "Ready for one automatic purchase."}`;
       }
       this.monitorResultsRoot.append(
         element("div", { className: "na-watchlist-result" }, [
@@ -347,9 +322,9 @@ export class MainShopAutoBuyController {
               className: "na-button na-button--secondary na-button--small",
               type: "button",
               disabled: result.state !== "ready",
-              onClick: () => this.beginReview(result.candidate),
+              onClick: () => this.beginCandidate(result.candidate),
             },
-            "Review",
+            this.settings.dryRun ? "Review" : "Buy one",
           ),
         ]),
       );
@@ -417,12 +392,21 @@ export class MainShopAutoBuyController {
           .find((result) => result?.state === "ready")?.candidate;
         if (ready) {
           this.stopMonitoring();
-          setStatus(
-            this.status,
-            `Found ${ready.itemName} at ${formatPrice(ready.price)}. Monitoring stopped for exact review.`,
-            "success",
-          );
-          this.openReviewDialog(ready);
+          if (this.settings.dryRun) {
+            setStatus(
+              this.status,
+              `Found ${ready.itemName} at ${formatPrice(ready.price)}. Monitoring stopped for exact review.`,
+              "success",
+            );
+            this.openReviewDialog(ready);
+          } else {
+            setStatus(
+              this.status,
+              `Found ${ready.itemName} at ${formatPrice(ready.price)}. Binding one exact purchase…`,
+              "running",
+            );
+            await this.beginAutomaticPurchase(ready);
+          }
           return;
         }
         setStatus(
@@ -463,22 +447,60 @@ export class MainShopAutoBuyController {
       }
     }
     if (announce && this.status) {
-      setStatus(
-        this.status,
-        "MS Autobuy monitoring stopped. No haggle page was opened.",
-        "success",
-      );
+      setStatus(this.status, "MS Autobuy monitoring stopped. No purchase was armed.", "success");
     }
   }
 
-  beginReview(candidate) {
+  beginCandidate(candidate) {
     this.stopMonitoring({ announce: this.monitoring });
-    this.openReviewDialog(candidate);
+    if (this.settings.dryRun) this.openReviewDialog(candidate);
+    else void this.beginAutomaticPurchase(candidate);
+  }
+
+  beginReview(candidate) {
+    this.beginCandidate(candidate);
+  }
+
+  async beginAutomaticPurchase(candidate) {
+    if (!candidate || this.purchaseArming || this.settings.dryRun || !this.settings.enabled) return;
+    this.purchaseArming = true;
+    const operationId = crypto.randomUUID();
+    try {
+      setStatus(this.status, "Rechecking the exact Kauvara listing…", "running");
+      const prepared = await this.send({
+        type: MESSAGE_TYPES.prepareMainShopPurchase,
+        operationId,
+        candidate,
+      });
+      const html = await this.shopFetcher();
+      const fresh = verifyFreshMainShopCandidate(html, candidate);
+      if (!fresh.fresh) throw new Error(fresh.error);
+      const responseFingerprint = await createTextFingerprint(html);
+      const confirmed = await this.send({
+        type: MESSAGE_TYPES.confirmMainShopPurchase,
+        operationId,
+        reviewId: prepared.reviewId,
+        candidate,
+        responseFingerprint,
+        freshStateVerified: true,
+      });
+      if (confirmed.purchaseArmed !== true) {
+        throw new Error("The extension did not arm the exact Kauvara purchase.");
+      }
+      setStatus(
+        this.status,
+        "Exact purchase armed. Reloading current stock for Neopets' confirmation step…",
+        "running",
+      );
+      this.purchaseLauncher(candidate);
+    } catch (error) {
+      setStatus(this.status, `${error.message} No automatic retry was attempted.`, "error");
+      this.purchaseArming = false;
+    }
   }
 
   openReviewDialog(candidate) {
-    if (!candidate || this.dialog) return;
-    const operationId = crypto.randomUUID();
+    if (!candidate || this.dialog || !this.settings.dryRun) return;
     const dialog = element("dialog", { className: "na-dialog" });
     this.dialog = dialog;
     const confirmation = element("input", { type: "checkbox" });
@@ -486,16 +508,12 @@ export class MainShopAutoBuyController {
       type: "button",
       className: "na-button na-button--primary",
       disabled: true,
-      text: this.settings.dryRun ? "Finish dry run" : "Open exact haggle page",
+      text: "Finish dry run",
     });
     confirmation.addEventListener("change", () => {
       actionButton.disabled = !confirmation.checked;
     });
-    let submitting = false;
-    const close = ({ force = false } = {}) => {
-      if (submitting && !force) return;
-      dialog.close();
-    };
+    const close = () => dialog.close();
     const closeButton = element(
       "button",
       { type: "button", className: "na-icon-button", ariaLabel: "Close", onClick: close },
@@ -506,60 +524,14 @@ export class MainShopAutoBuyController {
       { type: "button", className: "na-button na-button--secondary", onClick: close },
       "Cancel",
     );
-    const setSubmitting = (value) => {
-      submitting = value;
-      confirmation.disabled = value;
-      closeButton.disabled = value;
-      cancelButton.disabled = value;
-      actionButton.disabled = value || !confirmation.checked;
-    };
-    dialog.addEventListener("cancel", (event) => {
-      if (submitting) event.preventDefault();
-    });
     actionButton.addEventListener("click", async () => {
       actionButton.disabled = true;
-      if (this.settings.dryRun) {
-        setStatus(
-          this.status,
-          `MS Autobuy dry run complete for ${candidate.itemName} at ${formatPrice(candidate.price)}. No haggle page was opened.`,
-          "success",
-        );
-        close({ force: true });
-        return;
-      }
-      setSubmitting(true);
-      try {
-        setStatus(this.status, "Rechecking the exact Kauvara listing…", "running");
-        const prepared = await this.send({
-          type: MESSAGE_TYPES.prepareMainShopHandoff,
-          operationId,
-          candidate,
-        });
-        const html = await this.shopFetcher();
-        const fresh = verifyFreshMainShopCandidate(html, candidate);
-        if (!fresh.fresh) throw new Error(fresh.error);
-        const responseFingerprint = await createTextFingerprint(html);
-        const confirmed = await this.send({
-          type: MESSAGE_TYPES.confirmMainShopHandoff,
-          operationId,
-          reviewId: prepared.reviewId,
-          candidate,
-          responseFingerprint,
-          freshStateVerified: true,
-        });
-        if (confirmed.haggleUrl !== candidate.haggleUrl) {
-          throw new Error("The authorized Kauvara haggle URL no longer matches this listing.");
-        }
-        setStatus(
-          this.status,
-          "Opening the exact Neopets haggle page. Complete the offer and human verification yourself.",
-          "running",
-        );
-        this.haggleNavigator(candidate, confirmed.haggleUrl);
-      } catch (error) {
-        setStatus(this.status, `${error.message} No automatic retry was attempted.`, "error");
-        setSubmitting(false);
-      }
+      setStatus(
+        this.status,
+        `MS Autobuy dry run complete for ${candidate.itemName} at ${formatPrice(candidate.price)}. No purchase flow was opened.`,
+        "success",
+      );
+      close();
     });
 
     dialog.append(
@@ -567,7 +539,7 @@ export class MainShopAutoBuyController {
         element("div", { className: "na-dialog__header" }, [
           element("div", {}, [
             element("h2", {
-              text: this.settings.dryRun ? "Review MS dry run" : "Confirm haggle handoff",
+              text: "Review MS dry run",
             }),
             element("p", { text: "Kauvara's Magic Shop · quantity is one item." }),
           ]),
@@ -586,24 +558,16 @@ export class MainShopAutoBuyController {
             element("dt", { text: "Current stock" }),
             element("dd", { text: String(candidate.stock) }),
           ]),
-          element("div", {}, [
-            element("dt", { text: "Maximum" }),
-            element("dd", { text: formatPrice(this.settings.maximumPrice) }),
-          ]),
         ]),
         element("label", { className: "na-confirm-row" }, [
           confirmation,
           element("span", {
-            text: this.settings.dryRun
-              ? "I reviewed this live listing and understand that no navigation or purchase will occur."
-              : "I authorize one fresh-validated handoff to this exact listing. I will complete Neopets' haggle and human verification manually.",
+            text: "I reviewed this live listing and understand that no navigation or purchase will occur.",
           }),
         ]),
         element("p", {
           className: "na-dialog__note",
-          text: this.settings.dryRun
-            ? "Dry run mode sends no purchase or haggle request."
-            : "The extension opens one exact haggle URL. It does not submit an offer, click verification imagery, or retry.",
+          text: "Dry run mode sends no purchase or haggle request.",
         }),
         element("div", { className: "na-dialog__actions" }, [cancelButton, actionButton]),
       ]),

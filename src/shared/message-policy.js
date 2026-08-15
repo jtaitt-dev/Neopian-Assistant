@@ -1,5 +1,6 @@
 import {
   isAllowedNeopetsPageUrl,
+  isKauvaraHaggleUrl,
   isKauvaraMagicShopUrl,
   isOwnShopStockUrl,
   isShopWizardUrl,
@@ -18,5 +19,8 @@ export function validateExtensionSender(sender, extensionId, pageKind) {
   if (pageKind === "pricing") return isOwnShopStockUrl(sender.tab.url);
   if (pageKind === "purchase") return isShopWizardUrl(sender.tab.url);
   if (pageKind === "mainShop") return isKauvaraMagicShopUrl(sender.tab.url);
+  if (pageKind === "mainShopPurchase") {
+    return isKauvaraMagicShopUrl(sender.tab.url) || isKauvaraHaggleUrl(sender.tab.url);
+  }
   return false;
 }

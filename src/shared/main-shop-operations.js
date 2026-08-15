@@ -25,7 +25,7 @@ export function validateMainShopLookupRequest(message, settingsInput) {
   return { valid: true, runId: message.runId, watchlist: savedWatchlist, settings };
 }
 
-export function validateMainShopHandoffRequest(message, settingsInput) {
+export function validateMainShopPurchaseRequest(message, settingsInput) {
   if (!isPlainObject(message) || !isValidUuid(message.operationId)) {
     return { valid: false, error: "The MS Autobuy operation identifier is invalid." };
   }
@@ -38,12 +38,6 @@ export function validateMainShopHandoffRequest(message, settingsInput) {
   );
   if (!watched) {
     return { valid: false, error: "This item is not in the saved MS Autobuy watchlist." };
-  }
-  if (candidate.price > settings.maximumPrice) {
-    return {
-      valid: false,
-      error: `The selected item exceeds the ${settings.maximumPrice.toLocaleString()} NP MS Autobuy limit.`,
-    };
   }
   return { valid: true, operationId: message.operationId, candidate, settings };
 }
@@ -61,15 +55,23 @@ export async function createMainShopFingerprint(candidateInput) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function isDuplicateMainShopHandoff(history, fingerprint, now = Date.now()) {
+export function isDuplicateMainShopPurchase(history, fingerprint, now = Date.now()) {
   if (!Array.isArray(history) || typeof fingerprint !== "string") return false;
   return history.some(
     (entry) =>
       isPlainObject(entry) &&
       entry.fingerprint === fingerprint &&
-      entry.status === "opened" &&
+      ["submitting", "verified", "uncertain"].includes(entry.status) &&
       Number.isSafeInteger(entry.timestamp) &&
       now - entry.timestamp <= MAIN_SHOP_LIMITS.deduplicationWindowMs,
+  );
+}
+
+export function isValidMainShopPurchaseTransition(currentPhase, nextPhase) {
+  return (
+    (currentPhase === "awaiting-listing" && nextPhase === "awaiting-verification") ||
+    (currentPhase === "awaiting-verification" && nextPhase === "awaiting-haggle") ||
+    (currentPhase === "awaiting-haggle" && nextPhase === "submitting")
   );
 }
 

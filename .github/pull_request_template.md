@@ -10,9 +10,9 @@ Describe the user-visible outcome and affected extension surfaces.
 - [ ] Consequential actions remain explicit, bounded, locked against duplicates, non-retrying, and
       verified.
 - [ ] Auto Pricing, MS Autobuy, and SW Autobuy preserve bounded sequential lookups, fresh-state
-      checks, strict price limits, one-shot behavior, and dry-run defaults.
-- [ ] MS Autobuy stops at one exact haggle-page handoff; offer entry and human verification remain
-      manual.
+      checks, validated prices, one-shot behavior, and dry-run defaults.
+- [ ] MS Autobuy waits for manual official verification before one exact listed-price offer; it
+      validates the result and never retries automatically.
 - [ ] No CAPTCHA bypass, stealth, detection evasion, credential access, or security-control
       circumvention is introduced.
 

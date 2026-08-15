@@ -6,6 +6,7 @@ import {
   getNextNeopianResetTimestamp,
   isAllowedItemIconUrl,
   isAllowedNeopetsPageUrl,
+  isKauvaraHaggleUrl,
   isKauvaraMagicShopUrl,
   isOwnShopStockUrl,
   isShopWizardUrl,
@@ -116,7 +117,7 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
   assert.deepEqual(settings.autoBuy.watchlist, ["Healing Potion I", "Codestone"]);
   assert.equal(settings.mainShopBuy.enabled, true);
   assert.equal(settings.mainShopBuy.dryRun, false);
-  assert.equal(settings.mainShopBuy.maximumPrice, 999_999);
+  assert.equal(Object.hasOwn(settings.mainShopBuy, "maximumPrice"), false);
   assert.equal(settings.mainShopBuy.requestIntervalMs, 8000);
   assert.deepEqual(settings.mainShopBuy.watchlist, ["Starlight Potion", "Supernova"]);
 });
@@ -125,10 +126,10 @@ test("MS Autobuy watchlists and candidates enforce exact Kauvara contracts", () 
   const values = [
     "  Starlight Potion  ",
     "starlight potion",
-    ...Array.from({ length: 20 }, (_, index) => `Potion ${index + 1}`),
+    ...Array.from({ length: 120 }, (_, index) => `Potion ${index + 1}`),
   ];
   const watchlist = sanitizeMainShopWatchlist(values);
-  assert.equal(watchlist.length, 10);
+  assert.equal(watchlist.length, 100);
   assert.equal(watchlist[0], "Starlight Potion");
   const candidate = {
     itemName: "Starlight Potion",
@@ -144,6 +145,12 @@ test("MS Autobuy watchlists and candidates enforce exact Kauvara contracts", () 
     null,
   );
   assert.equal(sanitizeMainShopCandidate({ ...candidate, stock: 0 }), null);
+  assert.equal(isKauvaraHaggleUrl(`${candidate.haggleUrl}&cf_token=opaque`, candidate), true);
+  assert.equal(
+    isKauvaraHaggleUrl(`${candidate.haggleUrl.replace("g=1", "g=2")}&cf_token=opaque`, candidate),
+    false,
+  );
+  assert.equal(isKauvaraHaggleUrl(`${candidate.haggleUrl}&next=bad`, candidate), false);
 });
 
 test("SW Autobuy watchlists are bounded, normalized, and case-insensitively deduplicated", () => {

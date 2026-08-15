@@ -2,6 +2,43 @@
 
 All notable project changes are documented here.
 
+## 7.13.0 — 2026-08-15
+
+Version 7.12.0 was increased to 7.13.0 because this release substantially expands the
+backward-compatible MS Autobuy workflow from a manual handoff to a guarded one-item purchase after
+the user completes Neopets' official verification.
+
+### Added
+
+- A tab-bound four-phase MS purchase state machine covering exact live-card confirmation,
+  user-completed site verification, exact haggle-form submission, and strict purchase-result
+  verification.
+- Automatic entry and one-time submission of the exact validated Kauvara listed price after the
+  official confirmation enables its Yes button.
+- A persistent in-page MS purchase banner with live state, cancellation before submission, verified
+  success, explicit failure, and uncertain-outcome messages.
+- Regression coverage for exact card binding, 100-name watchlist normalization, phase transitions,
+  token-bearing haggle-page validation, one-time offer submission, and dual-message success checks.
+
+### Changed
+
+- Expanded the MS Autobuy watchlist from 10 to 100 case-insensitively deduplicated exact item names.
+- Removed the MS-specific user price ceiling. Live mode accepts any valid Neopets listed price from
+  1 through 999,999 NP and submits that exact price; SW Autobuy's independent ceiling is unchanged.
+- The first real-mode match now fresh-checks and arms one exact purchase automatically instead of
+  opening an extension review dialog. Dry-run behavior remains non-mutating.
+- Updated storage to schema 6 and synchronized extension, package, build, CI artifact,
+  documentation, and release archive metadata at version 7.13.0.
+
+### Safety
+
+- Neopian Assistant does not inspect, click, solve, or bypass Neopets' verification control. The
+  user completes that control before the extension continues.
+- One-way listing fingerprints, a tab-bound pending state, a cross-tab lock, strict phase changes,
+  fresh stock validation, exact item/price/form checks, and no automatic retry protect the single
+  submitted offer.
+- Auto Pricing and SW Autobuy rules and behavior are unchanged in 7.13.0.
+
 ## 7.12.0 — 2026-08-15
 
 Version 7.11.0 was increased to 7.12.0 because this release adds the backward-compatible MS Autobuy

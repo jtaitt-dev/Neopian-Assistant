@@ -1,6 +1,5 @@
 import { MAIN_SHOP_LIMITS, SHOP_LIMITS } from "../shared/constants.js";
 import { fetchWithDeadline } from "../shared/network.js";
-import { sanitizeMainShopCandidate } from "../shared/validation.js";
 import { getMagicShopUrl } from "./main-shop-parser.js";
 
 function byteLength(value) {
@@ -46,22 +45,4 @@ export async function fetchMagicShopHtml({
     throw new Error("The Kauvara stock response exceeded the safe size limit.");
   }
   return html;
-}
-
-export function openKauvaraHagglePage(
-  candidateInput,
-  authorizedUrl,
-  navigateImplementation = (url) => globalThis.location.assign(url),
-) {
-  const candidate = sanitizeMainShopCandidate(candidateInput);
-  if (
-    !candidate ||
-    typeof authorizedUrl !== "string" ||
-    authorizedUrl !== candidate.haggleUrl ||
-    typeof navigateImplementation !== "function"
-  ) {
-    throw new TypeError("The authorized Kauvara haggle handoff is invalid.");
-  }
-  navigateImplementation(candidate.haggleUrl);
-  return candidate.haggleUrl;
 }

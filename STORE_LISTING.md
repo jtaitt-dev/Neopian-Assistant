@@ -25,10 +25,10 @@ dashboard for `www.neopets.com`.
 - Open daily activities without falsely marking them complete.
 - Mark completion explicitly, track cooldown-aware status, organize groups, search routines, and
   review local progress.
-- Use a separate disabled-by-default MS Autobuy watchlist for up to 10 exact Kauvara names.
-  Monitoring is sequential, user-started, cancellable, and read-only. Dry run stops after review;
-  real mode rechecks the exact listing and can open one bound haggle page. The user completes the
-  offer and human verification manually.
+- Use a separate disabled-by-default MS Autobuy watchlist for up to 100 exact Kauvara names.
+  Monitoring is sequential, user-started, and cancellable. Dry run stops after review; live mode
+  fresh-checks one exact match, waits for the user to complete Neopets' official verification, then
+  submits the exact listed price once and verifies the accepted-offer and inventory messages.
 - Use an opt-in Auto Pricing workflow on your own shop stock page. It checks Shop Wizard results at
   a conservative pace, calculates bounded suggestions, supports cancellation and dry-run review,
   rechecks fresh stock, locks one exact plan across tabs, submits at most once, and verifies every
@@ -48,8 +48,7 @@ enabled without applicable authorization. None of these statements grants genera
 other users or deployments.
 
 No analytics, telemetry, ads, developer server, remotely hosted executable code, CAPTCHA bypass,
-stealth behavior, cookie extraction, automatic haggle offer, or blind retry of a shop update is
-included.
+stealth behavior, cookie extraction, or blind retry of a shop update or purchase is included.
 
 Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 sponsored by Neopets.
@@ -79,18 +78,18 @@ price management. Every surface supports that purpose.
 
 ## Suggested screenshots
 
-1. `docs/evidence/dashboard-dailies-7.12.png` — current installed dailies dashboard with dynamic
+1. `docs/evidence/dashboard-dailies-7.12.png` — prior installed dailies dashboard with dynamic
    next-available tracking and approved official item icons.
-2. `docs/evidence/ms-autobuy-7.12.png` — current installed MS Autobuy watchlist and manual
-   human-verification boundary.
+2. `docs/evidence/ms-autobuy-7.12.png` — prior v7.12 MS Autobuy watchlist; current v7.13 behavior is
+   described in `docs/TEST_EVIDENCE.md`.
 3. `docs/evidence/auto-pricing-smoke.png` — opt-in dry-run settings and mocked results on a
    synthetic shop page.
 4. `docs/evidence/popup-smoke.png` — popup status, local-data summary, and exact disclaimer.
 5. `docs/evidence/options-smoke.png` — full settings, privacy, project-approval, and data-management
    surface.
 
-The current installed captures are cropped to the extension surface and omit account identity,
-balances, cookies, and session data. The remaining evidence uses a clean browser profile, synthetic
+The installed captures are cropped to the extension surface and omit account identity, balances,
+cookies, and session data. The remaining evidence uses a clean browser profile, synthetic
 account/shop rows, and mocked price responses.
 
 ## Category and support

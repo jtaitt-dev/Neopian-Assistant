@@ -69,6 +69,49 @@ export function isKauvaraMagicShopUrl(value) {
   );
 }
 
+export function isKauvaraHaggleUrl(value, candidate = null) {
+  if (!isAllowedNeopetsPageUrl(value)) return false;
+  const url = new URL(value);
+  const allowedKeys = new Set(["obj_info_id", "stock_id", "g", "cf_token"]);
+  const actualKeys = [...url.searchParams.keys()];
+  if (
+    url.username ||
+    url.password ||
+    url.pathname !== "/haggle.phtml" ||
+    actualKeys.length < 3 ||
+    actualKeys.length > 4 ||
+    new Set(actualKeys).size !== actualKeys.length ||
+    actualKeys.some((key) => !allowedKeys.has(key)) ||
+    !SHOP_OBJECT_ID_PATTERN.test(url.searchParams.get("obj_info_id") ?? "") ||
+    !SHOP_OBJECT_ID_PATTERN.test(url.searchParams.get("stock_id") ?? "") ||
+    !/^\d{1,2}$/.test(url.searchParams.get("g") ?? "")
+  ) {
+    return false;
+  }
+  const verificationToken = url.searchParams.get("cf_token");
+  if (
+    verificationToken !== null &&
+    (verificationToken.length < 1 || verificationToken.length > 4096)
+  ) {
+    return false;
+  }
+  if (candidate !== null) {
+    if (!isPlainObject(candidate) || typeof candidate.haggleUrl !== "string") return false;
+    let expectedUrl;
+    try {
+      expectedUrl = new URL(candidate.haggleUrl);
+    } catch {
+      return false;
+    }
+    return (
+      url.searchParams.get("obj_info_id") === candidate.objectId &&
+      url.searchParams.get("stock_id") === candidate.stockId &&
+      url.searchParams.get("g") === expectedUrl.searchParams.get("g")
+    );
+  }
+  return true;
+}
+
 export function isAllowedItemIconUrl(value) {
   try {
     const url = new URL(value);
@@ -184,12 +227,6 @@ export function sanitizeSettings(raw) {
   if (isPlainObject(raw.mainShopBuy)) {
     defaults.mainShopBuy.enabled = raw.mainShopBuy.enabled === true;
     defaults.mainShopBuy.dryRun = raw.mainShopBuy.dryRun !== false;
-    defaults.mainShopBuy.maximumPrice = boundedInteger(
-      raw.mainShopBuy.maximumPrice,
-      1,
-      MAIN_SHOP_LIMITS.absoluteMaximumPrice,
-      defaults.mainShopBuy.maximumPrice,
-    );
     defaults.mainShopBuy.watchlist = sanitizeMainShopWatchlist(raw.mainShopBuy.watchlist);
     defaults.mainShopBuy.requestIntervalMs = boundedInteger(
       raw.mainShopBuy.requestIntervalMs,

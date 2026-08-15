@@ -1,7 +1,9 @@
 import { STORAGE_KEYS } from "../shared/constants.js";
 import { areAppDataEquivalent, loadAppData } from "../shared/storage.js";
+import { isKauvaraHaggleUrl, isKauvaraMagicShopUrl } from "../shared/validation.js";
 import { NeopianAssistantApp } from "./app.js";
 import { claimInitialization, releaseInitialization } from "./lifecycle.js";
+import { continueMainShopPurchase } from "./main-shop-purchase-flow.js";
 
 async function initialize() {
   if (!claimInitialization()) return;
@@ -11,6 +13,11 @@ async function initialize() {
     if (data.settings.enabled) {
       app = new NeopianAssistantApp(data);
       app.mount();
+      if (isKauvaraMagicShopUrl(window.location.href) || isKauvaraHaggleUrl(window.location.href)) {
+        void continueMainShopPurchase().catch(() => {
+          console.warn("Neopian Assistant could not resume the pending MS Autobuy purchase.");
+        });
+      }
     }
   } catch {
     console.warn("Neopian Assistant could not initialize on this page.");
