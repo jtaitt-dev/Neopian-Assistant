@@ -18,6 +18,8 @@ feature, replaces the standalone Progress tab, and adds an automated tagged-rele
   lock for one exact haggle-page handoff.
 - A GitHub Actions release workflow that verifies a matching `v<version>` tag, audits dependencies,
   runs the full release gate, packages the extension, and publishes the versioned ZIP.
+- Current Node 24-compatible v7 releases of the official checkout, Node setup, and artifact upload
+  actions, removing the hosted runner's deprecated Node 20 compatibility warning.
 - Current sanitized installed-build screenshots for dynamic dailies and MS Autobuy.
 
 ### Changed
