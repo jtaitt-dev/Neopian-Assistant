@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-07-18
+Last updated: 2026-08-15
 
 Neopian Assistant is an unofficial, fan-made Chrome extension. It has no analytics, telemetry,
 advertising, tracking SDK, developer-operated server, or remotely hosted executable code.
@@ -18,6 +18,7 @@ advertising, tracking SDK, developer-operated server, or remotely hosted executa
 | Visible signed-in account name                             | A price scan or fresh price review                     | Bind Auto Pricing to the account visible on the user's own shop-stock page. |
 | Shop item IDs, names, field names, and prices              | Own shop-stock page and fresh pricing verification     | Build, compare, submit, and verify an exact reviewed price plan.            |
 | Shop Wizard item name, listing owner, object ID, and price | Explicit pricing lookup, SW Autobuy monitor, or review | Validate prices and bind one purchase review to one exact listing.          |
+| Kauvara item name, object ID, stock ID, price, and stock   | Explicit MS Autobuy monitor or handoff review          | Validate live stock and bind one exact official haggle-page handoff.        |
 | Neopets response text                                      | Pricing and purchase operations                        | Parse bounded prices/errors and require unambiguous final verification.     |
 
 The extension uses the browser's existing signed-in Neopets session for same-origin requests. It
@@ -29,6 +30,7 @@ session tokens, browser passwords, account-recovery data, email, or unrelated br
 Chrome extension local storage contains:
 
 - Feature settings, panel position, theme, and density.
+- Up to 10 bounded MS Autobuy watchlist names and the configured sequential lookup interval.
 - Up to 10 bounded SW Autobuy watchlist names and the configured sequential lookup interval.
 - Default or custom routine groups, names, approved Neopets URLs, optional official item-image URLs,
   cooldowns, and notes.
@@ -37,10 +39,13 @@ Chrome extension local storage contains:
 - Up to 20 redacted Auto Pricing records containing operation ID, timestamp, item count, and status.
 - Up to 20 redacted SW Autobuy records containing operation ID, timestamp, status, and a one-way
   SHA-256 listing fingerprint used for duplicate prevention.
+- Up to 20 redacted MS Autobuy handoff records containing operation ID, timestamp, status, and a
+  one-way SHA-256 listing fingerprint used for duplicate prevention.
 
-Purchase history does not store the account name, listing owner, item name, object ID, price,
-purchase URL, response body, cookie, or request header. A fingerprint is retained only as a
-non-display identity check; verified and uncertain fingerprints block the same listing for 24 hours.
+Shop-operation history does not store the account name, listing owner, item name, object or stock
+ID, price, URL, response body, cookie, or request header. A fingerprint is retained only as a
+non-display identity check; SW purchase fingerprints block the same listing for 24 hours and MS
+handoff fingerprints block an immediate duplicate.
 
 Chrome session storage contains bounded lookup timing, short-lived fresh-review records,
 confirmation tokens, and cross-tab locks. These values expire, are removed when operations finish,
@@ -48,7 +53,8 @@ or clear with the browser session.
 
 ## Data transmitted
 
-Data leaves the browser only when the user explicitly starts Auto Pricing or SW Autobuy.
+Data leaves the browser only when the user explicitly starts Auto Pricing, MS Autobuy, or SW
+Autobuy.
 
 ### Auto Pricing
 
@@ -71,6 +77,19 @@ Data leaves the browser only when the user explicitly starts Auto Pricing or SW 
 - The bounded returned page is parsed locally to verify the expected item and an unambiguous success
   message.
 
+### MS Autobuy
+
+- After the user starts monitoring, the exact Kauvara page at
+  `https://www.neopets.com/objects.phtml?type=shop&obj_type=2` is read sequentially at the
+  configured 8–60 second interval while the dashboard tab stays open.
+- Names, visible/data prices, stock, IDs, and exact haggle URLs are parsed locally from bounded
+  authenticated responses. Dry run sends no handoff message and performs no navigation.
+- After opt-in, disabling dry run, price-ceiling validation, explicit review, and a fresh exact
+  listing comparison, the browser may navigate once to the validated
+  `https://www.neopets.com/haggle.phtml` URL.
+- The extension does not submit a haggle offer, interact with human-verification imagery, bypass a
+  CAPTCHA, or determine whether the manual purchase succeeds.
+
 The only service receiving feature data is Neopets through `www.neopets.com`. The project owner
 receives no extension data. Official daily images load from `images.neopets.com` and expose only the
 ordinary request metadata inherent in loading a web image.
@@ -79,7 +98,7 @@ ordinary request metadata inherent in loading a web image.
 
 Local data remains until the user removes the extension, clears its Chrome data, or uses **Settings
 → Privacy & Data → Clear extension data**. The clear action requires confirmation and removes
-settings, routines, completion history, migration records, pricing history, purchase history,
+settings, routines, completion history, migration records, pricing history, MS/SW shop history,
 tokens, timing records, and locks.
 
 Users can export the main validated settings/routine data as JSON and import a validated export of
@@ -101,8 +120,8 @@ identity are never logged.
 
 ## User choices
 
-Global enablement, dailies, Auto Pricing, and SW Autobuy are independently controlled. Both
-consequential features are off by default and dry-run by default. Legacy migration never silently
-enables either feature. Disabling a feature prevents its service-worker requests.
+Global enablement, dailies, Auto Pricing, MS Autobuy, and SW Autobuy are independently controlled.
+All shop automation features are off by default and dry-run by default. Legacy migration never
+silently enables a feature. Disabling one prevents its service-worker requests.
 
 For security reporting, see [SECURITY.md](SECURITY.md).

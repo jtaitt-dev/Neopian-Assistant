@@ -13,6 +13,9 @@ Thank you for helping improve Neopian Assistant.
 - Keep SW Autobuy disabled by default, dry-run by default, watchlist-bounded, sequential,
   cancellable, quantity one, bounded by a hard maximum, fresh-state checked, duplicate-blocked,
   cross-tab locked, one-shot, and verified.
+- Keep MS Autobuy disabled by default, dry-run by default, exact-Kauvara-only, watchlist-bounded,
+  sequential, cancellable, price-capped, fresh-state checked, duplicate-blocked, and limited to one
+  exact haggle-page handoff. Offer entry and human verification must remain manual.
 - Do not add CAPTCHA bypass, anti-bot evasion, stealth behavior, proxy rotation, credential access,
   cookie extraction, hidden automation, or blind retries of consequential actions.
 - Never commit real account data, credentials, browser profiles, logs, HAR files, screenshots with

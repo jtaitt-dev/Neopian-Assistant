@@ -2,7 +2,7 @@
 
 Audit date: 2026-08-15
 
-Audited release: 7.11.0
+Audited release: 7.12.0
 
 Manifest version: 3
 
@@ -35,29 +35,33 @@ progress, disabled-startup reactivation, a three-tab layout assumption, two real
 response differences, and dashboard settings buttons that called an API unavailable to content
 scripts.
 
-The 7.11.0 source suite extends the previously validated production build with dynamic daily claim
-cooldowns and a bounded live SW Autobuy watchlist. Authenticated installed-build validation
-confirmed dailies navigation/manual state, settings persistence, the repaired settings route, and a
-complete no-purchase SW Autobuy dry run without exposing account identity. Initial Auto Pricing
-scans failed closed because service-worker requests did not receive authenticated Wizard results.
-Moving the bounded read-only fetch to the authenticated same-origin Neopets content context exposed
-a second live-markup defect: own-stock parsing selected the bold quantity cell instead of the
-first-cell image label. The repaired dry run then passed, while the first authorized real attempt
-stopped before submission because its final worker-origin stock GET lacked the page session. The
-original price remained unchanged. Bounded same-origin Wizard reads and exact worker-authorized
-mutation transports preserve that authority boundary. Fresh own-stock validation now uses a
-short-lived hidden same-origin frame because Neopets returns only an authenticated shell to
-programmatic GETs and hydrates stock rows with its page scripts. The worker retains
-sender/page/settings/plan/rate/fingerprint/token/lock authority. The live process endpoint is also
-corrected. The authenticated 7.10.0 SW Autobuy monitor, ceiling, persistence, and no-purchase dry
-run passed after reload. Its review transition exposed a truthful-status defect, and a final source
-trace found that in-flight consequential dialogs could be dismissed before their requests settled.
-Those review-lifecycle defects and the hydrated-stock gate are repaired in the current 78-test
-build. A focused installed-build retest confirmed truthful monitor-stop status before review,
-no-purchase dry run completion, dashboard-tab cancellation, restored settings after reload,
-single-root mounting, and no extension console error or warning. The 7.11.0 installed build also
-passed a real no-spend daily claim and dynamic cooldown persistence check after an exact extension
-reload through bounded Windows UI Automation; no privileged-URL or profile-access bypass was used.
+The 7.12.0 source suite extends the previously validated production build with dynamic daily claim
+cooldowns, a bounded live SW Autobuy watchlist, and the new exact-Kauvara MS Autobuy monitor and
+manual haggle handoff. Authenticated installed-build validation confirmed dailies navigation/manual
+state, settings persistence, the repaired settings route, and a complete no-purchase SW Autobuy dry
+run without exposing account identity. Initial Auto Pricing scans failed closed because
+service-worker requests did not receive authenticated Wizard results. Moving the bounded read-only
+fetch to the authenticated same-origin Neopets content context exposed a second live-markup defect:
+own-stock parsing selected the bold quantity cell instead of the first-cell image label. The
+repaired dry run then passed, while the first authorized real attempt stopped before submission
+because its final worker-origin stock GET lacked the page session. The original price remained
+unchanged. Bounded same-origin Wizard reads and exact worker-authorized mutation transports preserve
+that authority boundary. Fresh own-stock validation now uses a short-lived hidden same-origin frame
+because Neopets returns only an authenticated shell to programmatic GETs and hydrates stock rows
+with its page scripts. The worker retains sender/page/settings/plan/rate/fingerprint/token/lock
+authority. The live process endpoint is also corrected. The authenticated 7.10.0 SW Autobuy monitor,
+ceiling, persistence, and no-purchase dry run passed after reload. Its review transition exposed a
+truthful-status defect, and a final source trace found that in-flight consequential dialogs could be
+dismissed before their requests settled. Those review-lifecycle defects and the hydrated-stock gate
+are repaired in the current 78-test build. A focused installed-build retest confirmed truthful
+monitor-stop status before review, no-purchase dry run completion, dashboard-tab cancellation,
+restored settings after reload, single-root mounting, and no extension console error or warning. The
+7.11.0 installed build also passed a real no-spend daily claim and dynamic cooldown persistence
+check after an exact extension reload through bounded Windows UI Automation; no privileged-URL or
+profile-access bypass was used. The installed 7.12.0 build then passed an authenticated Kauvara
+exact-match dry run with no haggle navigation or purchase, persisted the temporary test
+configuration, removed a discovered literal `null` presentation defect, and restored safe
+disabled/empty defaults after reload.
 
 ## Scope and method
 
@@ -65,12 +69,13 @@ Reviewed files and surfaces included:
 
 - Manifest, permissions, CSP, background service worker, message routes, storage, migrations, and
   network wrapper.
-- Content initialization, teardown, timers, resize observer, dashboard, dailies, progress, shop
-  parsing, Auto Pricing, and SW Autobuy.
+- Content initialization, teardown, timers, resize observer, dashboard, dailies, Kauvara parsing and
+  MS Autobuy, shop parsing, Auto Pricing, and SW Autobuy.
 - Popup, options, import/export/delete, operation history, CSS, keyboard/focus states, and branding.
 - Build, validation, secret scanning, deterministic packaging, dependency lockfile, CI, branch
   policy, tests, editable SVG, generated icon references, and repository documentation.
-- Authenticated live page structure for own shop stock, own shop front, and Shop Wizard results.
+- Authenticated live page structure for own shop stock, own shop front, Kauvara stock, and Shop
+  Wizard results.
 
 The review used direct source tracing, trust-boundary analysis, bounded live DOM inspection, Node
 unit/integration tests, production bundling, static unsafe-API searches, secret scanning, dependency
@@ -88,6 +93,8 @@ audit, Manifest/icon/reference validation, and deterministic package generation.
 | Price lookup         | Auto Pricing enabled; user starts scan            | Exact own-stock page; reads visible account and indexed shop form               | Fixed Wizard POST; session lookup rate; app settings                                       | Sequential 6–60 s spacing, cancellation, timeout, bounded response; lookup/parser/network tests                                                      |
 | Price review/dry run | User reviews selected suggestions                 | Dashboard table/dialog                                                          | No mutation in dry run                                                                     | Exact rows and 1–999,999 NP prices; explicit checkbox; plan/price tests                                                                              |
 | Price update         | Dry run off; user confirms                        | Exact own-stock page plus bounded, script-hydrated same-origin stock snapshot   | One fixed shop POST, verification snapshot, session review/token/lock, redacted history    | Fresh account/row/ID/name/field/current-price match, SHA-256 plan/response binding, no retry, exact verification; hydration/stale/lock/partial tests |
+| MS Autobuy monitor   | MS Autobuy enabled; user starts saved watchlist   | Exact Kauvara shop; up to 10 persisted exact names                              | Sequential fixed Kauvara GETs; shared session lookup rate                                  | UUID/watchlist/settings binding, 8–60 s pacing, cancellation, bounded response, exact visible/data identity/price/stock/URL tests                    |
+| MS Autobuy handoff   | Dry run off; user confirms one current listing    | Exact Kauvara shop and validated `haggle.phtml` URL                             | Fresh fixed stock GET, session review/lock, hashed local handoff history                   | Ceiling, positive stock, exact fresh identity/URL, duplicate window, one navigation; offer and human verification remain manual                      |
 | SW Autobuy monitor   | SW Autobuy enabled; user starts saved watchlist   | Exact Wizard page; up to 10 persisted exact names                               | Sequential fixed Wizard POSTs; shared session lookup rate                                  | UUID/name/settings binding, 6–60 s pacing, cancellation, bounded response, dynamic validated results; watchlist/controller/parser tests              |
 | SW Autobuy dry run   | User reviews one monitored or current-page result | Exact Wizard page; reads results heading, listing link, visible price           | No purchase request                                                                        | Quantity one and hard maximum shown; no URL followed; settings/validation/parser tests                                                               |
 | SW Autobuy real      | Dry run off; user confirms one listing            | Exact Wizard page and validated `browseshop.phtml` URL                          | Fresh fixed Wizard POST, one purchase GET, session review/token/lock, hashed local history | Exact item/owner/object/visible+URL price, allowed query keys, ceiling, 24 h dedup, no retry, strict response verification; purchase tests           |
@@ -231,7 +238,7 @@ executable code, or developer server exists.
 
 - Service-worker session/local storage is authoritative for rates, tokens, locks, and duplicate
   state; in-memory queues only serialize work while the worker is alive.
-- Writes are serialized; settings and imported/corrupt data sanitize to schema v4 safe defaults.
+- Writes are serialized; settings and imported/corrupt data sanitize to schema v5 safe defaults.
 - Timers, resize debounce, observer, listeners, and active price scans are cleaned up.
 - The only repeating content timer is a cleared 30-second visible-status refresh; lookups are
   sequential by design.
@@ -249,11 +256,11 @@ executable code, or developer server exists.
 - All source JavaScript: `node --check` passed.
 - `npm run verify`: formatting, Biome, Node tests, production build, Manifest/file/icon/CSP/API
   validation, and secret scan passed.
-- `npm test`: 78 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 67.64% lines, 76.60% branches, and 75.42% functions.
-- `npm run package`: deterministically creates the 21-file, 90,623-byte
-  `release/neopian-assistant-7.11.0.zip` (SHA-256
-  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B`).
+- `npm test`: 92 passed, 0 failed, 0 skipped.
+- `npm run test:coverage`: 71.14% lines, 76.17% branches, and 75.65% functions.
+- `npm run package`: deterministically creates the 21-file, 95,993-byte
+  `release/neopian-assistant-7.12.0.zip` (SHA-256
+  `647CCDDC8B31213ABF0AEF2010D176595219BA70EFE929FABD581BD639A10AE3`).
 - Manifest validator confirmed 11 referenced files, generated icon dimensions/alpha, narrow
   permissions, CSP-safe HTML, no unsafe production API, consistent branding, and synchronized
   version.
@@ -331,6 +338,16 @@ Completed without mutation or sensitive capture:
   the one-shot POST again verified exactly one change, and a final reload showed 490 NP. Auto
   Pricing was restored to disabled, dry run enabled, undercut by 1,000 NP, floor 1, maximum 10, and
   an 8-second interval; a reload verified every value persisted.
+- Reloaded the 7.12.0 build and validated MS Autobuy on the exact Kauvara page. One current
+  low-value in-stock card passed the strict visible/data name and price, positive-stock, and exact
+  haggle-URL contract. A temporary one-name watchlist persisted across reload, the worker-authorized
+  monitor stopped on the exact match, and the acknowledged dry run stayed on Kauvara with an
+  unchanged tab count and the explicit result that no haggle page opened. The check exposed a
+  literal `null` UI artifact from an absent notice; the conditional rendering and regression test
+  were repaired, rebuilt, reloaded, and verified. MS Autobuy was restored to disabled, dry run
+  enabled, a 10,000 NP maximum, a 10-second interval, and an empty watchlist; reload confirmed those
+  values and one dashboard root. No offer, CAPTCHA/human-verification interaction, or purchase was
+  attempted.
 
 No username, balance, shop name, third-party owner, object ID, raw page HTML, cookie, token, auth
 header, browser profile, or account screenshot was saved or committed. Only the controlled one-item
@@ -339,18 +356,19 @@ shop price update and its restoration were submitted; no purchase URL was follow
 Early `dist/` builds were manually reloaded because Chrome browser automation correctly rejects
 direct DOM access to `chrome://extensions/`. Computer Use later invoked the visible extension reload
 control at the user's explicit request; the newly repaired monitor behavior proved that build
-active. For 7.11.0, an ignored local PowerShell helper used bounded Windows UI Automation and
+active. For 7.12.0, an ignored local PowerShell helper used bounded Windows UI Automation and
 required exactly one Chrome window, one Extensions tab, and one exact **Neopian Assistant** card
-before invoking its reload control and verifying version 7.11.0. It did not inspect Chrome profile
+before invoking its reload control and verifying version 7.12.0. It did not inspect Chrome profile
 data, storage, cookies, or authentication material. No privileged-URL bypass or profile manipulation
 was used.
 
 ## Remaining limitations and required follow-up
 
-1. **The controlled purchase remains action-time gated.** The one-item pricing mutation and exact
-   restoration passed with safe settings restored. A single low-value purchase remains limited to
-   unambiguous identity, price, and response checks, with confirmation immediately before the
-   purchase.
+1. **The controlled SW Autobuy purchase remains action-time gated.** The one-item pricing mutation
+   and exact restoration passed with safe settings restored. A single low-value SW purchase remains
+   limited to unambiguous identity, price, and response checks, with confirmation immediately before
+   the purchase. MS Autobuy intentionally has no automatic final purchase: offer entry and human
+   verification remain manual on Neopets' haggle page.
 2. **Live markup can change.** Parsers fail closed, but maintainers must update bounded selectors
    and fixtures after verified site changes.
 3. **Purchase response wording is intentionally strict.** Unknown success wording produces
@@ -358,8 +376,8 @@ was used.
 4. **Network ambiguity cannot be eliminated.** A transport failure after submission may leave remote
    state changed. The extension blocks blind retry and tells the user to inspect state.
 5. **Policy authorization is deployment-specific.** The owner states project approval for Auto
-   Pricing and official icons; SW Autobuy remains especially sensitive and must not be enabled
-   without applicable authorization. Neopets' current terms broadly prohibit unauthorized
+   Pricing and official icons; MS Autobuy and SW Autobuy remain especially sensitive and must not be
+   enabled without applicable authorization. Neopets' current terms broadly prohibit unauthorized
    automation.
 6. **Chrome Web Store review is outside this repository task.** Store disclosures and policy fit
    must be reviewed again at submission time.

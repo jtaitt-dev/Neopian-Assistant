@@ -2,6 +2,41 @@
 
 All notable project changes are documented here.
 
+## 7.12.0 — 2026-08-15
+
+Version 7.11.0 was increased to 7.12.0 because this release adds the backward-compatible MS Autobuy
+feature, replaces the standalone Progress tab, and adds an automated tagged-release path.
+
+### Added
+
+- MS Autobuy for Kauvara's Magic Shop with a persisted 10-name exact watchlist, an 8–60 second
+  sequential monitor, positive-stock and hard-price-ceiling checks, and dynamic per-item results.
+- Strict Kauvara card parsing that binds visible and data names/prices, object and stock IDs,
+  positive stock, and an exact three-parameter `haggle.phtml` URL.
+- A dry-run review that sends no handoff message and performs no navigation, plus a real-mode fresh
+  stock recheck, short-lived review, one-way listing fingerprint, duplicate window, and cross-tab
+  lock for one exact haggle-page handoff.
+- A GitHub Actions release workflow that verifies a matching `v<version>` tag, audits dependencies,
+  runs the full release gate, packages the extension, and publishes the versioned ZIP.
+- Current sanitized installed-build screenshots for dynamic dailies and MS Autobuy.
+
+### Changed
+
+- Replaced the dashboard's standalone **Progress** tab with **MS Autobuy**. Daily progress remains
+  visible in the Dailies experience through claim states and live next-available countdowns.
+- Updated storage to schema 5 for MS Autobuy settings and redacted handoff history.
+- Synchronized extension, package, build, CI artifact, documentation, and release archive metadata
+  at version 7.12.0.
+
+### Fixed
+
+- Prevented an absent Kauvara-page notice from rendering as the literal text `null`; the installed
+  UI and regression suite verify the corrected state.
+
+MS Autobuy deliberately stops at Neopets' official haggle page. The user completes the offer and
+human verification manually; the extension does not solve or click verification, submit an offer, or
+claim purchase success. Auto Pricing rules and behavior are unchanged in 7.12.0.
+
 ## 7.11.0 — 2026-08-15
 
 Version 7.10.0 was increased to 7.11.0 because this release adds backward-compatible dynamic daily

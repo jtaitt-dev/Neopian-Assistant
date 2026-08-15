@@ -5,14 +5,14 @@
 _Your all-in-one companion for smarter Neopets routines._
 
 Neopian Assistant is a Manifest V3 Chrome extension for organizing Neopets routines, comparing shop
-prices, monitoring a bounded Shop Wizard watchlist, and handling a tightly limited one-item purchase
-workflow. The dashboard is built with vanilla JavaScript, HTML, and CSS and runs only on the audited
-`https://www.neopets.com/*` origin.
+prices, monitoring bounded Shop Wizard and Kauvara watchlists, and handling tightly limited one-item
+shop workflows. The dashboard is built with vanilla JavaScript, HTML, and CSS and runs only on the
+audited `https://www.neopets.com/*` origin.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-Current extension version: **7.11.0**
+Current extension version: **7.12.0**
 
 Manifest version: **3**
 
@@ -26,6 +26,9 @@ Minimum Chrome version: **114**
 | Tracking   | Manual claim cooldown        | Stores a local claim time only after the user presses the separate check control.              | Extension data only                    |
 | Assistance | Shop Wizard price scan       | Reads validated prices at a conservative interval and prepares suggestions.                    | No                                     |
 | Automation | Reviewed Auto Pricing update | Sends one exact shop-price form after fresh-state validation and explicit confirmation.        | Yes—changes shop prices                |
+| Assistance | MS Autobuy live watchlist    | Monitors up to 10 exact names in Kauvara's Magic Shop while its dashboard tab is open.         | No                                     |
+| Assistance | MS Autobuy dry run           | Detects, fresh-checks, and reviews one Kauvara listing without opening its haggle page.        | No                                     |
+| Handoff    | Reviewed one-item MS Autobuy | Opens one exact fresh-bound haggle page; the user completes the offer and verification.        | No automatic purchase                  |
 | Assistance | SW Autobuy live watchlist    | Sequentially monitors up to 10 exact Shop Wizard names while its dashboard tab is open.        | No                                     |
 | Assistance | SW Autobuy dry run           | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
 | Automation | Reviewed one-item SW Autobuy | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
@@ -42,7 +45,7 @@ The movable and resizable on-page dashboard provides:
 
 - Light, dark, or system theme.
 - Comfortable or compact density.
-- Dailies, Progress, Auto Pricing, and SW Autobuy tabs.
+- Dailies, MS Autobuy, Auto Pricing, and SW Autobuy tabs.
 - Searchable and editable daily groups.
 - Polite status announcements, keyboard-operable controls, visible focus, and reduced-motion
   support.
@@ -50,16 +53,15 @@ The movable and resizable on-page dashboard provides:
 
 ### Popup
 
-The toolbar popup shows global enablement, the current page type, whether Auto Pricing or SW Autobuy
-is available there, a dashboard focus action, settings access, the privacy summary, and the exact
-unofficial disclaimer.
+The toolbar popup shows global enablement, the current page type, feature availability, a dashboard
+focus action, settings access, the privacy summary, and the exact unofficial disclaimer.
 
 ### Settings
 
 The options page controls global appearance, dailies, Auto Pricing, SW Autobuy, dry-run modes,
 watchlist names, request pacing, price limits, local export/import, deletion, and redacted operation
-history. Imports are schema-validated, capped at 1 MB, and require confirmation before replacing
-data.
+history. MS Autobuy's controls live in its exact-page dashboard tab. Imports are schema-validated,
+capped at 1 MB, and require confirmation before replacing data.
 
 ### Dailies
 
@@ -101,6 +103,30 @@ accepted; malformed grouping, internal whitespace, negatives, decimals, empty va
 prices are rejected. If a submitted request cannot be verified, its status is `uncertain` and the
 user is told to reload and inspect stock before any manual retry.
 
+### MS Autobuy
+
+MS Autobuy replaces the former standalone Progress tab. It monitors only Kauvara's Magic Shop and
+stops at Neopets' official haggle and human-verification boundary.
+
+1. It is off by default and dry-run is on by default.
+2. Save up to 10 exact item names, set an 8–60 second interval, and set a hard listed-price ceiling
+   from 1 through 999,999 NP. The default ceiling is 10,000 NP.
+3. Open `https://www.neopets.com/objects.phtml?type=shop&obj_type=2` and select **Start
+   monitoring**. Monitoring is sequential, cancellable, and active only while the MS Autobuy
+   dashboard tab stays open.
+4. Every stock read is worker-authorized against the persisted watchlist and exact Kauvara page.
+   Cards must have matching visible/data names, matching visible/data prices, positive stock, and an
+   exact `haggle.phtml` URL containing only `obj_info_id`, `stock_id`, and `g`.
+5. The first eligible exact match stops monitoring and opens a quantity-one review. Dry run finishes
+   there without a runtime handoff or navigation.
+6. In real mode, explicit review authorizes one additional paced stock read. The same name, object,
+   stock record, price, positive stock, and exact URL must still match within a short-lived review.
+7. A one-way listing fingerprint, duplicate window, and cross-tab lock then authorize one exact
+   haggle-page navigation. There is no automatic retry.
+8. The user enters the offer and completes Neopets' human verification manually. Neopian Assistant
+   never submits the offer, clicks verification imagery, solves a CAPTCHA, or claims the purchase
+   succeeded.
+
 ### SW Autobuy
 
 SW Autobuy combines a read-only live watchlist with a guarded one-item workflow; it is not a bulk or
@@ -135,9 +161,10 @@ inventory and is never treated as permission to retry.
 
 ### Dry-run behavior
 
-Dry run is the safe starting point for both consequential features:
+Dry run is the safe starting point for every shop workflow:
 
 - Auto Pricing performs lookups and shows the exact review without posting prices.
+- MS Autobuy reviews a current Kauvara listing without opening its haggle page.
 - SW Autobuy validates and reviews a listing without following its purchase URL.
 - Dry-run completion messages explicitly state that no mutation was submitted.
 
@@ -152,6 +179,7 @@ Dry run is the safe starting point for both consequential features:
 - Short-lived SHA-256-bound reviews and confirmations.
 - Session-backed cross-tab locks that survive service-worker suspension.
 - Persistent hashed duplicate-purchase protection.
+- Exact Kauvara stock-card and haggle-URL validation with a manual human-verification boundary.
 - Request deadlines, cancellation for price scans, conservative lookup spacing, and response-size
   caps.
 - No automatic retry for price changes or purchases.
@@ -162,10 +190,12 @@ Dry run is the safe starting point for both consequential features:
 
 ## Screenshots
 
-The checked-in images use synthetic fixture data and contain no account identity, balances, cookies,
-or session data.
+The current dashboard images are sanitized installed-build captures. Older auxiliary images use
+synthetic fixture data. None contains account identity, balances, cookies, or session data.
 
-![Dailies dashboard](docs/evidence/dashboard-smoke.png)
+![Dynamic dailies dashboard](docs/evidence/dashboard-dailies-7.12.png)
+
+![MS Autobuy watchlist](docs/evidence/ms-autobuy-7.12.png)
 
 ![Auto Pricing dry-run review](docs/evidence/auto-pricing-smoke.png)
 
@@ -175,7 +205,7 @@ or session data.
 
 ## Install from a release package
 
-1. Obtain `neopian-assistant-7.11.0.zip` from the release artifacts.
+1. Obtain `neopian-assistant-7.12.0.zip` from the GitHub release assets.
 2. Extract the archive to a permanent local folder.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable **Developer mode**.
@@ -235,9 +265,12 @@ src/
   assets/icon.svg            Editable original extension mark
   content/
     index.js                  Idempotent content lifecycle and settings reactivation
-    app.js                    Dashboard shell, dailies, progress, and controller routing
+    app.js                    Dashboard shell, dailies, and controller routing
     auto-pricing.js           Price-scan, fresh-review, confirmation, and verification UI
     auto-buy.js               Live watchlist, one-item dry run, and purchase review UI
+    main-shop-auto-buy.js     Kauvara monitor, exact review, and manual haggle handoff UI
+    main-shop-client.js       Fixed authenticated Kauvara stock/handoff transport
+    main-shop-parser.js       Strict Kauvara stock-card and exact haggle-URL parser
     shop-client.js            Fixed authenticated stock/update/purchase transport
     shop-parser.js            Bounded live-page and response parsers
   popup/                      Toolbar popup
@@ -246,7 +279,7 @@ src/
 scripts/                      Build, package, branch, manifest, icon, and secret validation
 test/                         Node tests and credential-free HTML fixtures
 docs/design/                  Product design concepts
-docs/evidence/                Sanitized synthetic smoke-test screenshots
+docs/evidence/                Sanitized installed-build and synthetic smoke-test screenshots
 dist/                         Generated unpacked production build (ignored)
 release/                      Generated release archives (ignored)
 tmp/                          Ignored local test artifacts and backups
@@ -261,10 +294,10 @@ memory is never authoritative.
 
 ## Permissions and hosts
 
-| Declaration                 | Why it is needed                                                                                               |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `storage`                   | Settings, routines, completion history, schema migration, redacted operation history, and session locks.       |
-| `https://www.neopets.com/*` | Dashboard injection and the fixed authenticated requests used by reviewed pricing and one-item purchase flows. |
+| Declaration                 | Why it is needed                                                                                         |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `storage`                   | Settings, routines, completion history, schema migration, redacted operation history, and session locks. |
+| `https://www.neopets.com/*` | Dashboard injection and fixed authenticated requests used by pricing, MS Autobuy, and SW Autobuy flows.  |
 
 There are no optional permissions, alarms, notifications, scripting, cookies, downloads, history,
 tabs host escalation, external messaging, or web-accessible resources. The top-frame content script
@@ -273,14 +306,14 @@ resources from `https://images.neopets.com` and are never executable code.
 
 ## Privacy and local data
 
-Chrome extension storage contains validated settings, routines, completion state/history, schema
-state, and bounded redacted operation records. Purchase records contain an operation ID, timestamp,
-status, and a one-way listing fingerprint—not account names, store owners, item names, prices,
-response bodies, cookies, or authentication data.
+Chrome extension storage contains validated settings, routines, completion state/history, MS/SW
+watchlists, schema state, and bounded redacted operation records. Shop records contain an operation
+ID, timestamp, status, and a one-way listing fingerprint—not account names, store owners, item
+names, prices, response bodies, cookies, or authentication data.
 
-Network data goes only to Neopets when a user explicitly starts Auto Pricing or SW Autobuy. The
-extension never reads cookie values, passwords, auth headers, browser history, or unrelated account
-data. See [PRIVACY.md](PRIVACY.md) for the complete data-flow table.
+Network data goes only to Neopets when a user explicitly starts Auto Pricing, MS Autobuy, or SW
+Autobuy. The extension never reads cookie values, passwords, auth headers, browser history, or
+unrelated account data. See [PRIVACY.md](PRIVACY.md) for the complete data-flow table.
 
 To remove stored data:
 
@@ -326,6 +359,16 @@ retention behavior.
 - Keep the dashboard tab open. Switching tabs or navigating intentionally stops monitoring.
 - If a reviewed listing changes or disappears, let the monitor find a new validated result.
 - After an uncertain result, inspect inventory manually and do not retry that listing.
+
+### MS Autobuy is unavailable
+
+- Use the exact Kauvara URL: `https://www.neopets.com/objects.phtml?type=shop&obj_type=2`.
+- Save 1–10 exact item names, enable MS Autobuy, and begin with dry run.
+- A listing must have positive stock and be at or below the configured maximum.
+- Keep the MS Autobuy tab open; switching tabs, navigating, or closing the dashboard stops it.
+- If a listing changes or sells out during review, begin a new monitor cycle. Do not force a stale
+  haggle URL.
+- Complete any offer and human verification yourself on Neopets' haggle page.
 
 ### Shop Wizard asks you to wait
 
@@ -386,6 +429,8 @@ Release checklist:
 3. Load the exact `dist/` build in Chrome and complete the documented safe smoke tests.
 4. Inspect `release/neopian-assistant-<version>.zip` and confirm only production files are present.
 5. Review the Git diff and secret scan before tagging or publishing.
+6. Merge a passing pull request to protected `main`, then push the matching `v<version>` tag. The
+   release workflow re-runs audit/verification/package checks and publishes the exact versioned ZIP.
 
 ## Security reporting
 
@@ -403,11 +448,13 @@ they contain no sensitive data.
   `uncertain`, blocks blind retry, and requires manual inspection.
 - SW Autobuy verifies the transaction response; duplicate items already in inventory make generic
   inventory-name checks insufficient as standalone proof.
+- MS Autobuy deliberately stops at the official haggle page. Final offer entry, human verification,
+  and purchase outcome remain manual and are not asserted by the extension.
 - The Chrome Web Store submission and review process is outside this repository release.
 - Neopets' current terms broadly restrict unauthorized automation. The repository owner states that
   Auto Pricing and official icon use have project-specific approval; that statement is not general
-  permission for users, forks, or deployments. SW Autobuy remains particularly policy-sensitive and
-  should not be enabled without applicable authorization.
+  permission for users, forks, or deployments. MS Autobuy and SW Autobuy remain particularly
+  policy-sensitive and should not be enabled without applicable authorization.
 
 Primary policy references:
 

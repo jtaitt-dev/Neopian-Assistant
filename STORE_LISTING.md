@@ -25,6 +25,10 @@ dashboard for `www.neopets.com`.
 - Open daily activities without falsely marking them complete.
 - Mark completion explicitly, track cooldown-aware status, organize groups, search routines, and
   review local progress.
+- Use a separate disabled-by-default MS Autobuy watchlist for up to 10 exact Kauvara names.
+  Monitoring is sequential, user-started, cancellable, and read-only. Dry run stops after review;
+  real mode rechecks the exact listing and can open one bound haggle page. The user completes the
+  offer and human verification manually.
 - Use an opt-in Auto Pricing workflow on your own shop stock page. It checks Shop Wizard results at
   a conservative pace, calculates bounded suggestions, supports cancellation and dry-run review,
   rechecks fresh stock, locks one exact plan across tabs, submits at most once, and verifies every
@@ -33,17 +37,19 @@ dashboard for `www.neopets.com`.
   Monitoring is sequential, user-started, cancellable, and read-only. A reviewed one-item action
   enforces a hard maximum price, quantity one, a fresh-listing check, hashed duplicate prevention, a
   cross-tab lock, one request, no retry, and strict response verification.
-- Configure themes, density, dailies, Auto Pricing, SW Autobuy, dry-run, watchlist names, pricing
-  rules, limits, and request spacing.
+- Configure themes, density, dailies, Auto Pricing, MS Autobuy, SW Autobuy, dry-run, watchlist
+  names, pricing rules, limits, and request spacing.
 - Export, import, or clear local extension data from a complete settings page.
 
-Auto Pricing and SW Autobuy are off by default and dry-run is on by default. The repository owner
-states that this project has specific approval for the automated pricing workflow and official daily
-item icons. SW Autobuy remains policy-sensitive and must not be enabled without applicable
-authorization. None of these statements grants general authorization to other users or deployments.
+Auto Pricing, MS Autobuy, and SW Autobuy are off by default and dry-run is on by default. The
+repository owner states that this project has specific approval for the automated pricing workflow
+and official daily item icons. MS Autobuy and SW Autobuy remain policy-sensitive and must not be
+enabled without applicable authorization. None of these statements grants general authorization to
+other users or deployments.
 
 No analytics, telemetry, ads, developer server, remotely hosted executable code, CAPTCHA bypass,
-stealth behavior, cookie extraction, or blind retry of a shop update is included.
+stealth behavior, cookie extraction, automatic haggle offer, or blind retry of a shop update is
+included.
 
 Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 sponsored by Neopets.
@@ -73,16 +79,19 @@ price management. Every surface supports that purpose.
 
 ## Suggested screenshots
 
-1. `docs/evidence/dashboard-smoke.png` — on-page dailies dashboard using approved official item
-   icons on a credential-free fixture.
-2. `docs/evidence/auto-pricing-smoke.png` — opt-in dry-run settings and mocked results on a
+1. `docs/evidence/dashboard-dailies-7.12.png` — current installed dailies dashboard with dynamic
+   next-available tracking and approved official item icons.
+2. `docs/evidence/ms-autobuy-7.12.png` — current installed MS Autobuy watchlist and manual
+   human-verification boundary.
+3. `docs/evidence/auto-pricing-smoke.png` — opt-in dry-run settings and mocked results on a
    synthetic shop page.
-3. `docs/evidence/popup-smoke.png` — popup status, local-data summary, and exact disclaimer.
-4. `docs/evidence/options-smoke.png` — full settings, privacy, project-approval, and data-management
+4. `docs/evidence/popup-smoke.png` — popup status, local-data summary, and exact disclaimer.
+5. `docs/evidence/options-smoke.png` — full settings, privacy, project-approval, and data-management
    surface.
 
-All evidence uses a clean browser profile, synthetic account/shop rows, and mocked price responses.
-It contains no real account credentials or real shop history.
+The current installed captures are cropped to the extension surface and omit account identity,
+balances, cookies, and session data. The remaining evidence uses a clean browser profile, synthetic
+account/shop rows, and mocked price responses.
 
 ## Category and support
 

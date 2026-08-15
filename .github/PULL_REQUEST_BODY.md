@@ -2,7 +2,7 @@
 
 This PR completes the production audit, repair, Manifest V3 hardening, Neopian Assistant rebrand,
 guarded shop workflows, test foundation, documentation, and release pipeline through extension
-version 7.11.0.
+version 7.12.0.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
@@ -12,11 +12,15 @@ It now requires fresh authenticated shop state immediately before a one-shot upd
 adds a separate disabled-by-default, dry-run-by-default SW Autobuy workflow: a live watchlist of up
 to 10 exact Shop Wizard names plus one-item review with a hard maximum, quantity one, stale-listing
 checks across at most eight rate-authorized market sections, cross-tab locking, hashed duplicate
-prevention, no retry, and strict response verification.
+prevention, no retry, and strict response verification. It also replaces the standalone Progress tab
+with disabled-by-default, dry-run-by-default MS Autobuy: a 10-name exact Kauvara watchlist, strict
+stock-card and haggle-URL validation, a hard ceiling, fresh listing binding, duplicate protection, a
+cross-tab lock, and one exact haggle-page handoff. The user completes the offer and human
+verification manually.
 
 ## User-visible changes
 
-- Four dashboard sections: Dailies, Progress, Auto Pricing, and SW Autobuy.
+- Four dashboard sections: Dailies, MS Autobuy, Auto Pricing, and SW Autobuy.
 - Dynamic daily claim countdowns cover Neopian daily/monthly resets, per-day caps, and elapsed
   cooldowns; claimed routines cannot be accidentally reset by a second click.
 - Auto Pricing selected-price minimum of 1 NP and strict thousands-separator parsing.
@@ -25,14 +29,18 @@ prevention, no retry, and strict response verification.
 - SW Autobuy 10-item watchlist, 6–60 second sequential monitoring, dynamic validated results,
   explicit cancellation, review dialog, dry run, maximum-price control, redacted history, and clear
   failure guidance.
+- MS Autobuy 10-item watchlist, 8–60 second exact-Kauvara monitoring, dynamic stock results,
+  explicit cancellation, review dialog, dry run, hard ceiling, fresh handoff binding, redacted
+  history, and a manual human-verification boundary.
 - Manual/anytime claims reset at the Neopian day boundary and show their exact remaining wait.
 - Enabling the extension after disabled startup mounts it without a page reload.
-- Synchronized 7.11.0 version, schema 4 migration, rebuilt release package, and complete current
-  documentation.
+- Synchronized 7.12.0 version, schema 5 migration, tagged-release workflow, rebuilt release package,
+  current screenshots, and complete documentation.
 
 ## Consequential-action protections
 
-- Exact feature enablement, sender extension ID, integer tab, and own-stock/Wizard page checks.
+- Exact feature enablement, sender extension ID, integer tab, and own-stock/Kauvara/Wizard page
+  checks.
 - Strict item, account, row, field, URL, quantity, price, maximum, and message schemas.
 - Fixed HTTPS Neopets endpoints and 2 MB response caps.
 - Conservative global lookup spacing, deadlines, scan/monitor cancellation, persisted-name lookup
@@ -42,6 +50,8 @@ prevention, no retry, and strict response verification.
 - Strict UUID lookup/cancellation schemas and pruning of expired review/confirmation state before
   new consequential reviews.
 - Hashed 24-hour duplicate blocking for running, pending, verified, or uncertain purchases.
+- Hashed MS listing duplicate blocking and one exact fresh-bound haggle-page handoff; no offer or
+  human-verification automation.
 - One mutation request, no blind retry, and explicit `uncertain` classification after ambiguous
   submission.
 - Exact post-price verification and strict expected-item/success-text purchase verification.
@@ -55,7 +65,7 @@ prevention, no retry, and strict response verification.
   resources, page-world injection, inline scripts/handlers, unsafe HTML APIs, `eval`, remote code,
   telemetry, ads, or developer backend.
 - Exact origin validation rejects alternate schemes, subdomains, and ports.
-- Existing schema data now persists its canonical schema 4 migration once; corrupt/excessive values
+- Existing schema data now persists its canonical schema 5 migration once; corrupt/excessive values
   recover to safe defaults.
 - Original editable extension logo and generated 16/19/24/32/38/48/64/96/128 PNGs are retained.
   Official daily item icons remain under the owner's project-specific approval.
@@ -68,7 +78,7 @@ prevention, no retry, and strict response verification.
 - One cleared 30-second status tick, event-driven updates, sequential lookups, and resize debounce.
 - Semantic controls, tables, dialogs, status regions, progress, cancellation, visible focus,
   keyboard operation, responsive surfaces, themes, and reduced-motion support.
-- Dry-run tests prove neither controller sends a mutation message.
+- Dry-run tests prove Auto Pricing, MS Autobuy, and SW Autobuy do not send a mutation/handoff.
 
 ## Validation
 
@@ -76,24 +86,25 @@ prevention, no retry, and strict response verification.
 - All source JavaScript `node --check` — passed.
 - `npm run format:check` — passed.
 - `npm run lint` — passed.
-- `npm test` — passed; 78 passed, 0 failed, 0 skipped.
-- `npm run test:coverage` — passed; 67.64% lines, 76.60% branches, 75.42% functions.
+- `npm test` — passed; 92 passed, 0 failed, 0 skipped.
+- `npm run test:coverage` — passed; 71.14% lines, 76.17% branches, 75.65% functions.
 - `npm run build` — passed; production output in `dist/`.
 - `npm run validate` — passed; Manifest V3, 11 references, icons/alpha, CSP-safe HTML, branding,
   synchronized version, and production API constraints.
 - `npm run secret-scan` — passed; no credential-shaped values, sensitive filenames, or private local
   paths.
-- `npm run package` — passed twice deterministically; 21-file, 90,623-byte
-  `release/neopian-assistant-7.11.0.zip`, SHA-256
-  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B`.
+- `npm run package` — passed twice deterministically; 21-file, 95,993-byte
+  `release/neopian-assistant-7.12.0.zip`, SHA-256
+  `647CCDDC8B31213ABF0AEF2010D176595219BA70EFE929FABD581BD639A10AE3`.
 - `npm run validate:branch -- feature/neopian-assistant-audit-rebrand` — passed.
 
 Added coverage for strict price parsing, zero protection, fresh shop state, partial-result status,
 purchase limits/item/URL/visible-price validation, duplicate history, locks, strict response
 verification, SW Autobuy watchlist bounds/authorization/mismatch shutdown/dynamic parser/review-stop
-status, bounded eight-section fresh listing checks, dry-run non-mutation, sender/page binding,
-disabled-startup reactivation, Neopian daily/monthly and daylight-saving reset boundaries,
-idempotent daily claim caps, schema write-back, and live-results heading fallback.
+status, bounded eight-section fresh listing checks, MS Autobuy watchlist/authorization/exact Kauvara
+parser/fresh-handoff/dedup/lock/no-navigation dry run, sender/page binding, disabled-startup
+reactivation, Neopian daily/monthly and daylight-saving reset boundaries, idempotent daily claim
+caps, schema write-back, and live-results heading fallback.
 
 ## Browser and live-account validation
 
@@ -184,16 +195,27 @@ claim and displayed a disabled **Claimed · available in 10h 24m** row; a full p
 the claim and advanced the countdown to **10h 23m**. No account identity, balance, reward details,
 authentication material, raw HTML, or screenshot was saved.
 
+For 7.12.0, the same bounded helper rebuilt and verified the installed version. On the exact Kauvara
+page, MS Autobuy loaded with disabled/dry-run safe defaults, persisted one temporary exact watchlist
+item, found a current low-value in-stock match, stopped monitoring, required explicit review, and
+completed dry run without opening a haggle page or changing the browser tab count. A literal `null`
+presentation artifact exposed by the installed panel was repaired and regression tested. The final
+reload verified disabled, dry run, 10,000 NP maximum, 10-second interval, empty watchlist, one root,
+and no literal `null`. No offer, human verification, or purchase was attempted. Current Dailies and
+MS Autobuy screenshots are cropped to the extension root and contain no account identity, balance,
+cookie, token, object/stock ID, response, or browser-profile data.
+
 ## Documentation and policy
 
 - Rebuilt README with feature modes, architecture, commands, installation, popup/options/dailies/
-  pricing/SW Autobuy guides, dry run, safeguards, permissions, privacy, clearing, troubleshooting,
-  service-worker inspection, branches, contributions, PRs, releases, versioning, reporting,
-  limitations, policy risk, and license status.
+  pricing/MS Autobuy/SW Autobuy guides, dry run, safeguards, permissions, privacy, clearing,
+  troubleshooting, service-worker inspection, branches, contributions, PRs, releases, versioning,
+  reporting, limitations, policy risk, and license status.
 - Updated changelog, privacy, security, audit, contributing, store listing, test evidence, and PR
   template to match source.
-- Auto Pricing and official-icon approval remains explicitly project-specific. SW Autobuy is
-  disclosed as policy-sensitive and must not be enabled without applicable authorization.
+- Auto Pricing and official-icon approval remains explicitly project-specific. MS Autobuy and SW
+  Autobuy are disclosed as policy-sensitive and must not be enabled without applicable
+  authorization.
 
 ## Remaining limitations
 

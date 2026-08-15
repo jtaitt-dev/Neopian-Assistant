@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest version on the `main` branch. The currently supported
-extension release is 7.11.x.
+extension release is 7.12.x.
 
 ## Reporting a vulnerability
 
@@ -34,6 +34,8 @@ In scope:
 - Manifest permissions and content-script isolation.
 - Service-worker authorization/message validation and fixed same-origin network destinations.
 - Auto Pricing validation, confirmation, locking, idempotency, and verification.
+- MS Autobuy watchlist authorization, strict Kauvara stock-card and haggle-URL validation,
+  fresh-listing binding, duplicate prevention, locking, and manual verification boundary.
 - SW Autobuy watchlist authorization, item/price/URL validation, bounded rate-authorized
   fresh-listing section checks, duplicate prevention, locking, and response verification.
 - Storage validation and migration.
@@ -64,8 +66,12 @@ classification, and exact post-update verification.
 
 ## Consequential-action invariants
 
-- Auto Pricing can mutate only the signed-in user's own shop-stock page, and SW Autobuy can monitor
-  or act only from a Shop Wizard page.
+- Auto Pricing can mutate only the signed-in user's own shop-stock page, MS Autobuy can monitor only
+  the exact Kauvara shop and hand off only to one exact fresh listing, and SW Autobuy can monitor or
+  act only from a Shop Wizard page.
+- Every MS Autobuy lookup must match the persisted bounded watchlist and monitor UUID. A handoff
+  requires positive stock, the configured price ceiling, a short-lived fresh match, a listing
+  fingerprint, and a cross-tab lock; offer entry and human verification remain manual.
 - Every SW Autobuy lookup must match a persisted bounded watchlist name and monitor UUID; lookups
   are globally spaced, sequential, cancellable, and read-only.
 - Content messages must originate from this extension in an integer tab whose URL matches the exact
@@ -77,3 +83,5 @@ classification, and exact post-update verification.
 - A mutation is issued at most once. Any error after submission is `uncertain`, not a retry signal.
 - Price success requires exact fresh shop values; purchase success requires expected item identity
   and unambiguous Neopets success text.
+- MS Autobuy never submits an offer, clicks or solves human verification, or reports the manual
+  haggle outcome as verified.

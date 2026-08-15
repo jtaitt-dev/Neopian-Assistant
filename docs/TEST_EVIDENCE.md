@@ -2,18 +2,18 @@
 
 Evidence date: 2026-08-15
 
-Current production build: Neopian Assistant 7.11.0 (`dist/`)
+Current production build: Neopian Assistant 7.12.0 (`dist/`)
 
-Current release package: `release/neopian-assistant-7.11.0.zip`
+Current release package: `release/neopian-assistant-7.12.0.zip`
 
 ## Automated validation
 
-The current 7.11.0 build passed:
+The current 7.12.0 build passed:
 
 - Prettier formatting verification.
 - Biome lint with no warnings.
-- 78 Node behavioral tests, 78 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 67.64% aggregate line coverage, 76.60% branch coverage, and 75.42%
+- 92 Node behavioral tests, 92 passed, 0 failed, 0 skipped.
+- `npm run test:coverage`: 71.14% aggregate line coverage, 76.17% branch coverage, and 75.65%
   function coverage; UI surfaces also require installed-browser validation.
 - Syntax checking of every source JavaScript file.
 - esbuild production build.
@@ -22,15 +22,15 @@ The current 7.11.0 build passed:
 - Repository secret scan with no credential-shaped values, sensitive filenames, or private local
   paths.
 - `npm audit --audit-level=high` with 0 vulnerabilities.
-- Deterministic 21-file release packaging: 90,623 bytes, SHA-256
-  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B` on two consecutive runs.
+- Deterministic 21-file release packaging: 95,993 bytes, SHA-256
+  `647CCDDC8B31213ABF0AEF2010D176595219BA70EFE929FABD581BD639A10AE3` on two consecutive runs.
 
 The expanded suite covers price parsing/limits/verification, fresh shop state, partial-result
 classification, purchase maximums/item/URL identity/visible price/fingerprint/duplicate window/
-locks/response verification, 10-item SW Autobuy watchlist normalization/authorization/dynamic
-rendering/parser behavior, sender/page validation, daily timezone resets, disabled-startup
-reactivation, storage defaults/migration/corruption, timeouts/abort, Manifest references, branding,
-and branch policy.
+locks/response verification, 10-item MS/SW Autobuy watchlist normalization/authorization/dynamic
+rendering/parser behavior, exact Kauvara card and haggle-URL validation, sender/page validation,
+daily timezone resets, disabled-startup reactivation, storage defaults/migration/corruption,
+timeouts/abort, Manifest references, branding, and branch policy.
 
 ## Prior clean-profile installed-build evidence
 
@@ -228,6 +228,36 @@ preserved the claim and displayed **Claimed · available in 10h 23m**, demonstra
 persistence and a live countdown to the next Neopian daily boundary. No account identity, balance,
 reward details, token, raw page HTML, or screenshot was saved.
 
+## Current 7.12.0 MS Autobuy installed-build evidence
+
+The bounded reload helper rebuilt and loaded the unpacked extension, required one exact extension
+card, and verified version 7.12.0. On the exact authenticated Kauvara URL, the installed dashboard:
+
+- Mounted exactly one root with **Dailies**, **MS Autobuy**, **Auto Pricing**, and **SW Autobuy**;
+  the former standalone Progress tab was absent.
+- Loaded safe MS defaults: disabled, dry run enabled, 10,000 NP maximum, 10-second interval, and an
+  empty 10-name watchlist.
+- Parsed a current low-value in-stock Kauvara card using matching visible/data identity and price,
+  positive stock, and the exact bounded haggle-link contract.
+- Saved one exact temporary watchlist name, persisted enablement/dry-run/watchlist values across a
+  reload, and started one worker-authorized authenticated monitor.
+- Stopped automatically on the exact eligible match and opened a quantity-one review showing item,
+  current price, stock, and configured maximum.
+- Required the acknowledgement checkbox, completed dry run with the explicit message **No haggle
+  page was opened**, stayed on the exact Kauvara shop, and left the browser tab count unchanged.
+- Exposed and then verified the repair for one presentation defect where a missing off-page notice
+  rendered as literal `null`; the final installed panel and a regression assertion contain no such
+  text.
+- Restored and reload-verified the safe state: disabled, dry run enabled, 10,000 NP maximum,
+  10-second interval, empty watchlist, and one dashboard root.
+
+The real-mode source and tests bind one fresh stock response, exact candidate fingerprint,
+short-lived review, duplicate window, and cross-tab lock to one exact haggle URL. No offer or
+purchase was submitted during live validation. Human verification remains manual and is never
+clicked, solved, bypassed, or represented as verified by the extension. The two current screenshots
+were cropped to the extension root; they contain no account identity, balance, cookie, token,
+object/stock ID, raw response, or browser-profile data.
+
 ## Remaining installed-build gate
 
 Chrome browser automation rejects direct DOM access to `chrome://extensions/` under its
@@ -235,8 +265,8 @@ privileged-URL security policy. The exact visible reload control was invoked thr
 UI Automation as described above; no CDP bypass or profile manipulation was used. The remaining
 installed-build gates are:
 
-- One low-value purchase with strict response verification plus duplicate/multi-tab behavior, only
-  after action-time user confirmation.
+- One low-value SW Autobuy purchase with strict response verification plus duplicate/multi-tab
+  behavior, only after action-time user confirmation.
 - Popup/options internals remain a manual check because privileged `chrome-extension://` pages are
   blocked from browser automation.
 
@@ -249,7 +279,9 @@ compact than the high-fidelity concepts for the default 390 px dashboard width.
 
 ## Sanitized screenshots
 
-![Dailies dashboard smoke test](evidence/dashboard-smoke.png)
+![Dynamic dailies installed build](evidence/dashboard-dailies-7.12.png)
+
+![MS Autobuy installed build](evidence/ms-autobuy-7.12.png)
 
 ![Auto Pricing dry-run smoke test](evidence/auto-pricing-smoke.png)
 
