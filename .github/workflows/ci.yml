@@ -52,9 +52,9 @@ jobs:
       - name: Upload unpacked extension and release archive
         uses: actions/upload-artifact@v4
         with:
-          name: neopian-assistant-7.11.0
+          name: neopian-assistant-7.12.0
           path: |
             dist/
-            release/neopian-assistant-7.11.0.zip
+            release/neopian-assistant-7.12.0.zip
           if-no-files-found: error
           retention-days: 7

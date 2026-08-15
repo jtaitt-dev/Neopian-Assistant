@@ -239,6 +239,7 @@ export async function clearAllData() {
     STORAGE_KEYS.data,
     STORAGE_KEYS.operationHistory,
     STORAGE_KEYS.purchaseHistory,
+    STORAGE_KEYS.mainShopHistory,
     STORAGE_KEYS.migrationComplete,
     LEGACY_STORAGE_KEYS.data,
     LEGACY_STORAGE_KEYS.lastResetDate,

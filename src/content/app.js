@@ -11,6 +11,7 @@ import {
 } from "../shared/validation.js";
 import { AutoPricingController, createPricingDisclaimer } from "./auto-pricing.js";
 import { AutoBuyController } from "./auto-buy.js";
+import { MainShopAutoBuyController } from "./main-shop-auto-buy.js";
 
 function formatRemaining(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -57,6 +58,7 @@ export class NeopianAssistantApp {
     this.resizeTimer = null;
     this.pricing = null;
     this.buying = null;
+    this.mainShopBuying = null;
     this.closedForPage = false;
     this.dialogs = new Set();
     this.pendingDailyClaims = new Set();
@@ -181,7 +183,7 @@ export class NeopianAssistantApp {
     });
     for (const [id, label] of [
       ["dailies", "Dailies"],
-      ["progress", "Progress"],
+      ["mainShop", "MS Autobuy"],
       ["pricing", "Auto Pricing"],
       ["buying", "SW Autobuy"],
     ]) {
@@ -243,7 +245,7 @@ export class NeopianAssistantApp {
   }
 
   switchTab(tabId) {
-    if (!["dailies", "progress", "pricing", "buying"].includes(tabId)) return;
+    if (!["dailies", "mainShop", "pricing", "buying"].includes(tabId)) return;
     this.activeTab = tabId;
     for (const tab of this.root.querySelectorAll(".na-tab")) {
       tab.setAttribute("aria-selected", String(tab.dataset.tab === tabId));
@@ -256,9 +258,18 @@ export class NeopianAssistantApp {
     this.pricing = null;
     this.buying?.cleanup();
     this.buying = null;
+    this.mainShopBuying?.cleanup();
+    this.mainShopBuying = null;
     this.content.replaceChildren();
     if (this.activeTab === "dailies") this.renderDailies();
-    if (this.activeTab === "progress") this.renderProgress();
+    if (this.activeTab === "mainShop") {
+      this.mainShopBuying = new MainShopAutoBuyController({
+        data: this.data,
+        save: () => this.save(),
+        announce: (message, tone) => this.announce(message, tone),
+      });
+      this.mainShopBuying.render(this.content);
+    }
     if (this.activeTab === "pricing") {
       this.pricing = new AutoPricingController({
         data: this.data,
@@ -587,60 +598,6 @@ export class NeopianAssistantApp {
     ]);
   }
 
-  renderProgress() {
-    const itemsById = new Map(
-      this.data.groups.flatMap((group) => group.items).map((item) => [item.id, item]),
-    );
-    const today = getNeopianDateKey();
-    const todayEntries = this.data.history.filter(
-      (entry) => getNeopianDateKey(new Date(entry.timestamp)) === today,
-    );
-    const uniqueToday = new Set(todayEntries.map((entry) => entry.itemId));
-    this.content.append(
-      element("div", { className: "na-section-heading" }, [
-        element("div", {}, [
-          element("h2", { text: "Progress" }),
-          element("p", { text: "Completion history is stored locally in this browser." }),
-        ]),
-      ]),
-      this.createProgressSummary(),
-      element("section", { className: "na-stat-strip" }, [
-        element("div", {}, [
-          element("strong", { text: uniqueToday.size }),
-          element("span", { text: "Unique routines today" }),
-        ]),
-        element("div", {}, [
-          element("strong", { text: todayEntries.length }),
-          element("span", { text: "Completion marks today" }),
-        ]),
-      ]),
-      element("section", { className: "na-history" }, [
-        element("h3", { text: "Recent completion history" }),
-        todayEntries.length === 0
-          ? element("p", {
-              className: "na-empty-copy",
-              text: "Nothing has been marked complete today.",
-            })
-          : element(
-              "ol",
-              {},
-              todayEntries.slice(0, 20).map((entry) =>
-                element("li", {}, [
-                  element("span", { text: itemsById.get(entry.itemId)?.name ?? "Removed routine" }),
-                  element("time", {
-                    dateTime: new Date(entry.timestamp).toISOString(),
-                    text: new Date(entry.timestamp).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    }),
-                  }),
-                ]),
-              ),
-            ),
-      ]),
-    );
-  }
-
   rerenderDailies() {
     if (this.activeTab !== "dailies") return;
     this.content.replaceChildren();
@@ -882,6 +839,7 @@ export class NeopianAssistantApp {
     this.resizeObserver?.disconnect();
     this.pricing?.cleanup();
     this.buying?.cleanup();
+    this.mainShopBuying?.cleanup();
     for (const dialog of [...this.dialogs]) {
       if (dialog.open) dialog.close();
       else dialog.remove();

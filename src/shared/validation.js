@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, PURCHASE_LIMITS, SHOP_LIMITS } from "./constants.js";
+import { DEFAULT_SETTINGS, MAIN_SHOP_LIMITS, PURCHASE_LIMITS, SHOP_LIMITS } from "./constants.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ITEM_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,79}$/;
@@ -53,6 +53,20 @@ export function isOwnShopStockUrl(value) {
 export function isShopWizardUrl(value) {
   if (!isAllowedNeopetsPageUrl(value)) return false;
   return new URL(value).pathname === "/shops/wizard.phtml";
+}
+
+export function isKauvaraMagicShopUrl(value) {
+  if (!isAllowedNeopetsPageUrl(value)) return false;
+  const url = new URL(value);
+  const keys = [...url.searchParams.keys()];
+  return (
+    url.pathname === "/objects.phtml" &&
+    url.searchParams.get("type") === "shop" &&
+    url.searchParams.get("obj_type") === String(MAIN_SHOP_LIMITS.shopId) &&
+    keys.length === 2 &&
+    keys.includes("type") &&
+    keys.includes("obj_type")
+  );
 }
 
 export function isAllowedItemIconUrl(value) {
@@ -167,6 +181,23 @@ export function sanitizeSettings(raw) {
       defaults.autoBuy.requestIntervalMs,
     );
   }
+  if (isPlainObject(raw.mainShopBuy)) {
+    defaults.mainShopBuy.enabled = raw.mainShopBuy.enabled === true;
+    defaults.mainShopBuy.dryRun = raw.mainShopBuy.dryRun !== false;
+    defaults.mainShopBuy.maximumPrice = boundedInteger(
+      raw.mainShopBuy.maximumPrice,
+      1,
+      MAIN_SHOP_LIMITS.absoluteMaximumPrice,
+      defaults.mainShopBuy.maximumPrice,
+    );
+    defaults.mainShopBuy.watchlist = sanitizeMainShopWatchlist(raw.mainShopBuy.watchlist);
+    defaults.mainShopBuy.requestIntervalMs = boundedInteger(
+      raw.mainShopBuy.requestIntervalMs,
+      MAIN_SHOP_LIMITS.minLookupIntervalMs,
+      MAIN_SHOP_LIMITS.maxLookupIntervalMs,
+      defaults.mainShopBuy.requestIntervalMs,
+    );
+  }
   return defaults;
 }
 
@@ -181,6 +212,21 @@ export function sanitizePurchaseWatchlist(raw) {
     seen.add(key);
     watchlist.push(itemName);
     if (watchlist.length >= SHOP_LIMITS.maxPurchaseWatchlistItems) break;
+  }
+  return watchlist;
+}
+
+export function sanitizeMainShopWatchlist(raw) {
+  if (!Array.isArray(raw)) return [];
+  const watchlist = [];
+  const seen = new Set();
+  for (const value of raw) {
+    const itemName = boundedString(value, SHOP_LIMITS.maxItemNameLength);
+    const key = itemName.toLocaleLowerCase("en-US");
+    if (!itemName || seen.has(key)) continue;
+    seen.add(key);
+    watchlist.push(itemName);
+    if (watchlist.length >= MAIN_SHOP_LIMITS.maxWatchlistItems) break;
   }
   return watchlist;
 }
@@ -299,6 +345,46 @@ export function sanitizePurchaseCandidate(raw) {
   }
   url.hash = "";
   return { itemName, owner, objectId, price, purchaseUrl: url.href };
+}
+
+export function sanitizeMainShopCandidate(raw) {
+  if (!isPlainObject(raw)) return null;
+  const itemName = boundedString(raw.itemName, SHOP_LIMITS.maxItemNameLength);
+  const objectId = boundedString(raw.objectId, SHOP_LIMITS.maxItemIdLength);
+  const stockId = boundedString(raw.stockId, SHOP_LIMITS.maxItemIdLength);
+  const price = parseNeopointValue(raw.price);
+  const stock = typeof raw.stock === "number" ? raw.stock : Number.parseInt(String(raw.stock), 10);
+  const haggleUrl = boundedString(raw.haggleUrl, 500);
+  if (
+    !itemName ||
+    !SHOP_OBJECT_ID_PATTERN.test(objectId) ||
+    !SHOP_OBJECT_ID_PATTERN.test(stockId) ||
+    price === null ||
+    price < 1 ||
+    !Number.isSafeInteger(stock) ||
+    stock < 1 ||
+    stock > 999 ||
+    !isAllowedNeopetsPageUrl(haggleUrl)
+  ) {
+    return null;
+  }
+  const url = new URL(haggleUrl);
+  const allowedKeys = ["obj_info_id", "stock_id", "g"];
+  const actualKeys = [...url.searchParams.keys()];
+  if (
+    url.username ||
+    url.password ||
+    url.pathname !== "/haggle.phtml" ||
+    actualKeys.length !== allowedKeys.length ||
+    allowedKeys.some((key) => !actualKeys.includes(key)) ||
+    url.searchParams.get("obj_info_id") !== objectId ||
+    url.searchParams.get("stock_id") !== stockId ||
+    !/^\d{1,2}$/.test(url.searchParams.get("g") ?? "")
+  ) {
+    return null;
+  }
+  url.hash = "";
+  return { itemName, objectId, stockId, price, stock, haggleUrl: url.href };
 }
 
 export function parseCooldown(value) {

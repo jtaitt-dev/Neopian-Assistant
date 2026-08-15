@@ -1,4 +1,9 @@
-import { isAllowedNeopetsPageUrl, isOwnShopStockUrl, isShopWizardUrl } from "./validation.js";
+import {
+  isAllowedNeopetsPageUrl,
+  isKauvaraMagicShopUrl,
+  isOwnShopStockUrl,
+  isShopWizardUrl,
+} from "./validation.js";
 
 export function validateExtensionSender(sender, extensionId, pageKind) {
   if (
@@ -12,5 +17,6 @@ export function validateExtensionSender(sender, extensionId, pageKind) {
   if (pageKind === "neopets") return isAllowedNeopetsPageUrl(sender.tab.url);
   if (pageKind === "pricing") return isOwnShopStockUrl(sender.tab.url);
   if (pageKind === "purchase") return isShopWizardUrl(sender.tab.url);
+  if (pageKind === "mainShop") return isKauvaraMagicShopUrl(sender.tab.url);
   return false;
 }

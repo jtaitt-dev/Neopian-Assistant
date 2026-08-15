@@ -6,12 +6,15 @@ import {
   getNextNeopianResetTimestamp,
   isAllowedItemIconUrl,
   isAllowedNeopetsPageUrl,
+  isKauvaraMagicShopUrl,
   isOwnShopStockUrl,
   isShopWizardUrl,
   makeStableItemId,
   parseCooldown,
   parseNeopointValue,
   sanitizeDaily,
+  sanitizeMainShopCandidate,
+  sanitizeMainShopWatchlist,
   sanitizeSettings,
   sanitizeShopRow,
   sanitizePurchaseCandidate,
@@ -33,6 +36,18 @@ test("URL validation permits only the audited Neopets HTTPS origins", () => {
   assert.equal(isOwnShopStockUrl("https://www.neopets.com/market.phtml?type=till"), false);
   assert.equal(isShopWizardUrl("https://www.neopets.com/shops/wizard.phtml"), true);
   assert.equal(isShopWizardUrl("https://www.neopets.com/browseshop.phtml"), false);
+  assert.equal(
+    isKauvaraMagicShopUrl("https://www.neopets.com/objects.phtml?type=shop&obj_type=2"),
+    true,
+  );
+  assert.equal(
+    isKauvaraMagicShopUrl("https://www.neopets.com/objects.phtml?type=shop&obj_type=3"),
+    false,
+  );
+  assert.equal(
+    isKauvaraMagicShopUrl("https://www.neopets.com/objects.phtml?type=shop&obj_type=2&next=evil"),
+    false,
+  );
 });
 
 test("currency parsing rejects malformed, negative, decimal, and excessive prices", () => {
@@ -78,6 +93,13 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
       requestIntervalMs: 1,
       watchlist: ["Healing Potion I", "healing potion i", "  Codestone  "],
     },
+    mainShopBuy: {
+      enabled: true,
+      dryRun: false,
+      maximumPrice: 2_000_000,
+      requestIntervalMs: 1,
+      watchlist: ["Starlight Potion", "starlight potion", "  Supernova  "],
+    },
   });
   assert.equal(settings.enabled, true);
   assert.equal(settings.autoPricing.enabled, true);
@@ -92,6 +114,36 @@ test("settings recover safe defaults from corrupt or excessive values", () => {
   assert.equal(settings.autoBuy.maximumPrice, 999_999);
   assert.equal(settings.autoBuy.requestIntervalMs, 6000);
   assert.deepEqual(settings.autoBuy.watchlist, ["Healing Potion I", "Codestone"]);
+  assert.equal(settings.mainShopBuy.enabled, true);
+  assert.equal(settings.mainShopBuy.dryRun, false);
+  assert.equal(settings.mainShopBuy.maximumPrice, 999_999);
+  assert.equal(settings.mainShopBuy.requestIntervalMs, 8000);
+  assert.deepEqual(settings.mainShopBuy.watchlist, ["Starlight Potion", "Supernova"]);
+});
+
+test("MS Autobuy watchlists and candidates enforce exact Kauvara contracts", () => {
+  const values = [
+    "  Starlight Potion  ",
+    "starlight potion",
+    ...Array.from({ length: 20 }, (_, index) => `Potion ${index + 1}`),
+  ];
+  const watchlist = sanitizeMainShopWatchlist(values);
+  assert.equal(watchlist.length, 10);
+  assert.equal(watchlist[0], "Starlight Potion");
+  const candidate = {
+    itemName: "Starlight Potion",
+    objectId: "12345",
+    stockId: "987654321",
+    price: 1922,
+    stock: 11,
+    haggleUrl: "https://www.neopets.com/haggle.phtml?obj_info_id=12345&stock_id=987654321&g=1",
+  };
+  assert.deepEqual(sanitizeMainShopCandidate(candidate), candidate);
+  assert.equal(
+    sanitizeMainShopCandidate({ ...candidate, haggleUrl: `${candidate.haggleUrl}&next=bad` }),
+    null,
+  );
+  assert.equal(sanitizeMainShopCandidate({ ...candidate, stock: 0 }), null);
 });
 
 test("SW Autobuy watchlists are bounded, normalized, and case-insensitively deduplicated", () => {

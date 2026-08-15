@@ -6,13 +6,14 @@ export const BRAND = Object.freeze({
     "Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or sponsored by Neopets.",
 });
 
-export const APP_VERSION = "7.11.0";
-export const SCHEMA_VERSION = 4;
+export const APP_VERSION = "7.12.0";
+export const SCHEMA_VERSION = 5;
 
 export const STORAGE_KEYS = Object.freeze({
   data: "neopianAssistant.data",
   operationHistory: "neopianAssistant.operationHistory",
   purchaseHistory: "neopianAssistant.purchaseHistory",
+  mainShopHistory: "neopianAssistant.mainShopHistory",
   migrationComplete: "neopianAssistant.migrationComplete",
 });
 
@@ -37,6 +38,10 @@ export const MESSAGE_TYPES = Object.freeze({
   confirmPurchase: "shop.confirmPurchase",
   purchaseItem: "shop.purchaseItem",
   recordPurchaseVerification: "shop.recordPurchaseVerification",
+  authorizeMainShopLookup: "mainShop.authorizeLookup",
+  cancelMainShopMonitor: "mainShop.cancelMonitor",
+  prepareMainShopHandoff: "mainShop.prepareHandoff",
+  confirmMainShopHandoff: "mainShop.confirmHandoff",
 });
 
 export const SHOP_LIMITS = Object.freeze({
@@ -67,6 +72,19 @@ export const PURCHASE_LIMITS = Object.freeze({
   requestTimeoutMs: 20_000,
 });
 
+export const MAIN_SHOP_LIMITS = Object.freeze({
+  shopId: 2,
+  maxWatchlistItems: 10,
+  defaultMaximumPrice: 10_000,
+  absoluteMaximumPrice: 999_999,
+  minLookupIntervalMs: 8_000,
+  maxLookupIntervalMs: 60_000,
+  requestTimeoutMs: 15_000,
+  reviewTtlMs: 30_000,
+  lockTtlMs: 45_000,
+  deduplicationWindowMs: 24 * 60 * 60 * 1000,
+});
+
 export const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   theme: "system",
@@ -93,6 +111,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
     maximumPrice: PURCHASE_LIMITS.defaultMaximumPrice,
     watchlist: [],
     requestIntervalMs: 8_000,
+  },
+  mainShopBuy: {
+    enabled: false,
+    dryRun: true,
+    maximumPrice: MAIN_SHOP_LIMITS.defaultMaximumPrice,
+    watchlist: [],
+    requestIntervalMs: 10_000,
   },
   privacyAcknowledged: false,
 });

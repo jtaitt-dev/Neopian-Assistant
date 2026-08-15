@@ -3,6 +3,7 @@ import test from "node:test";
 import { parseHTML } from "linkedom";
 import { AutoBuyController } from "../src/content/auto-buy.js";
 import { AutoPricingController } from "../src/content/auto-pricing.js";
+import { MainShopAutoBuyController } from "../src/content/main-shop-auto-buy.js";
 
 const candidate = {
   itemName: "Healing Potion I",
@@ -14,6 +15,16 @@ const candidate = {
 };
 
 const matchingWizardHtml = `<div class="wizard-results-grid-shop"><li class="wizard-results-grid-header">Shop Owner Stock Price</li><li><a href="${candidate.purchaseUrl}"><span>safe_owner</span><span>1</span><span class="wizard-results-price">25 NP</span></a></li></div>`;
+
+const mainShopCandidate = {
+  itemName: "Test Healing Potion",
+  objectId: "12345",
+  stockId: "987654321",
+  price: 1922,
+  stock: 11,
+  haggleUrl: "https://www.neopets.com/haggle.phtml?obj_info_id=12345&stock_id=987654321&g=1",
+};
+const matchingMainShopHtml = `<!doctype html><html><body><form name="items_for_sale"><div class="shop-grid"><div class="shop-item"><div class="item-img" data-name="Test Healing Potion" data-price="1,922" data-link="/haggle.phtml?obj_info_id=12345&stock_id=987654321&g=1"></div><p class="item-name"><b>Test Healing Potion</b></p><p class="item-stock">11 in stock</p><p class="item-stock">Cost: 1,922 NP</p></div></div></form></body></html>`;
 
 function installDom() {
   const { document, window } = parseHTML("<!doctype html><html><body></body></html>");
@@ -76,6 +87,115 @@ test("Auto Buy dry run never sends a purchase message", async () => {
     globalThis.document = previous.document;
     globalThis.window = previous.window;
     globalThis.Node = previous.Node;
+  }
+});
+
+test("MS Autobuy dry run sends no message and opens no haggle page", async () => {
+  const previous = {
+    document: globalThis.document,
+    window: globalThis.window,
+    Node: globalThis.Node,
+  };
+  const dom = installDom();
+  globalThis.document = dom.document;
+  globalThis.window = dom.window;
+  globalThis.Node = dom.window.Node;
+  let messages = 0;
+  let navigations = 0;
+  try {
+    const controller = new MainShopAutoBuyController({
+      data: {
+        settings: {
+          mainShopBuy: {
+            enabled: true,
+            dryRun: true,
+            maximumPrice: 2000,
+            requestIntervalMs: 10000,
+            watchlist: [mainShopCandidate.itemName],
+          },
+        },
+      },
+      save: async () => undefined,
+      announce: () => undefined,
+      haggleNavigator: () => {
+        navigations += 1;
+      },
+    });
+    controller.status = document.createElement("div");
+    controller.send = async () => {
+      messages += 1;
+      return { ok: true };
+    };
+    controller.openReviewDialog(mainShopCandidate);
+    await confirmDialog(document, "Finish dry run");
+    assert.equal(messages, 0);
+    assert.equal(navigations, 0);
+    assert.match(controller.status.textContent, /No haggle page was opened/i);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+    globalThis.Node = previous.Node;
+  }
+});
+
+test("MS Autobuy stops on a live eligible match and opens one exact review", async () => {
+  const previous = {
+    chrome: globalThis.chrome,
+    document: globalThis.document,
+    window: globalThis.window,
+    Node: globalThis.Node,
+    DOMParser: globalThis.DOMParser,
+  };
+  const dom = installDom();
+  globalThis.document = dom.document;
+  globalThis.window = dom.window;
+  globalThis.Node = dom.window.Node;
+  globalThis.DOMParser = dom.window.DOMParser;
+  Object.defineProperty(globalThis.window, "location", {
+    configurable: true,
+    value: { href: "https://www.neopets.com/objects.phtml?type=shop&obj_type=2" },
+  });
+  globalThis.chrome = { runtime: { sendMessage: async () => ({ ok: true }) } };
+  try {
+    const controller = new MainShopAutoBuyController({
+      data: {
+        settings: {
+          mainShopBuy: {
+            enabled: true,
+            dryRun: true,
+            maximumPrice: 2000,
+            requestIntervalMs: 10000,
+            watchlist: [mainShopCandidate.itemName],
+          },
+        },
+      },
+      save: async () => undefined,
+      announce: () => undefined,
+      shopFetcher: async () => matchingMainShopHtml,
+    });
+    controller.send = async (message) => {
+      if (message.type === "mainShop.authorizeLookup") {
+        return { ok: true, watchlistCount: 1 };
+      }
+      return { ok: true };
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    controller.render(container);
+    assert.doesNotMatch(container.textContent, /null/);
+    controller.startMonitoring();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(controller.monitoring, false);
+    assert.ok(controller.dialog?.open);
+    assert.match(controller.dialog.textContent, /Test Healing Potion/);
+    assert.match(controller.status.textContent, /Monitoring stopped for exact review/i);
+    controller.cleanup();
+  } finally {
+    globalThis.chrome = previous.chrome;
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+    globalThis.Node = previous.Node;
+    globalThis.DOMParser = previous.DOMParser;
   }
 });
 

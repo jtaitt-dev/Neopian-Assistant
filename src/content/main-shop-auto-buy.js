@@ -1,0 +1,628 @@
+import { MAIN_SHOP_LIMITS, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constants.js";
+import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
+import { createTextFingerprint } from "../shared/pricing-operations.js";
+import { isKauvaraMagicShopUrl, sanitizeMainShopWatchlist } from "../shared/validation.js";
+import { fetchMagicShopHtml, openKauvaraHagglePage } from "./main-shop-client.js";
+import {
+  extractMainShopCandidates,
+  getMagicShopUrl,
+  parseMainShopCandidates,
+  verifyFreshMainShopCandidate,
+} from "./main-shop-parser.js";
+
+function formatPrice(value) {
+  return `${value.toLocaleString()} NP`;
+}
+
+function normalizeName(value) {
+  return value.toLocaleLowerCase("en-US");
+}
+
+export class MainShopAutoBuyController {
+  constructor({
+    data,
+    save,
+    announce,
+    shopFetcher = fetchMagicShopHtml,
+    haggleNavigator = openKauvaraHagglePage,
+  }) {
+    this.data = data;
+    this.save = save;
+    this.announce = announce;
+    this.shopFetcher = shopFetcher;
+    this.haggleNavigator = haggleNavigator;
+    this.status = null;
+    this.dialog = null;
+    this.monitoring = false;
+    this.monitorRunId = null;
+    this.monitorController = null;
+    this.monitorResults = new Map();
+    this.monitorResultsRoot = null;
+    this.monitorStartButton = null;
+    this.monitorStopButton = null;
+  }
+
+  get settings() {
+    return this.data.settings.mainShopBuy;
+  }
+
+  async send(message) {
+    const response = await chrome.runtime.sendMessage(message);
+    if (!response?.ok) {
+      throw new Error(response?.error || "The extension did not return a valid response.");
+    }
+    return response;
+  }
+
+  async saveSettings(message) {
+    await this.save();
+    this.announce(message, "success");
+  }
+
+  render(container) {
+    this.stopMonitoring();
+    container.replaceChildren();
+    const onMagicShopPage = isKauvaraMagicShopUrl(window.location.href);
+
+    const enabled = element("input", { type: "checkbox", checked: this.settings.enabled });
+    enabled.addEventListener("change", async () => {
+      this.settings.enabled = enabled.checked;
+      await this.saveSettings("MS Autobuy settings saved.");
+      this.render(container);
+    });
+    const dryRun = element("input", { type: "checkbox", checked: this.settings.dryRun });
+    dryRun.addEventListener("change", async () => {
+      this.settings.dryRun = dryRun.checked;
+      await this.saveSettings("MS Autobuy settings saved.");
+      this.render(container);
+    });
+    const maximumPrice = element("input", {
+      type: "number",
+      min: 1,
+      max: MAIN_SHOP_LIMITS.absoluteMaximumPrice,
+      step: 1,
+      inputMode: "numeric",
+      value: this.settings.maximumPrice,
+    });
+    maximumPrice.addEventListener("change", async () => {
+      this.settings.maximumPrice = Math.min(
+        MAIN_SHOP_LIMITS.absoluteMaximumPrice,
+        Math.max(1, Number.parseInt(maximumPrice.value, 10) || 1),
+      );
+      maximumPrice.value = this.settings.maximumPrice;
+      await this.saveSettings("MS Autobuy purchase limit saved.");
+      this.render(container);
+    });
+    const requestInterval = element("input", {
+      type: "number",
+      min: MAIN_SHOP_LIMITS.minLookupIntervalMs / 1000,
+      max: MAIN_SHOP_LIMITS.maxLookupIntervalMs / 1000,
+      step: 1,
+      inputMode: "numeric",
+      value: Math.round(this.settings.requestIntervalMs / 1000),
+    });
+    requestInterval.addEventListener("change", async () => {
+      const seconds = Math.min(
+        MAIN_SHOP_LIMITS.maxLookupIntervalMs / 1000,
+        Math.max(
+          MAIN_SHOP_LIMITS.minLookupIntervalMs / 1000,
+          Number.parseInt(requestInterval.value, 10) || MAIN_SHOP_LIMITS.minLookupIntervalMs / 1000,
+        ),
+      );
+      this.settings.requestIntervalMs = seconds * 1000;
+      requestInterval.value = seconds;
+      await this.saveSettings("MS Autobuy monitoring interval saved.");
+      this.render(container);
+    });
+    const watchlist = element("textarea", {
+      rows: 6,
+      maxLength: MAIN_SHOP_LIMITS.maxWatchlistItems * (SHOP_LIMITS.maxItemNameLength + 1),
+      value: this.settings.watchlist.join("\n"),
+      placeholder: "One exact Kauvara item name per line",
+      ariaLabel: "MS Autobuy watchlist",
+    });
+    const saveWatchlist = element(
+      "button",
+      {
+        className: "na-button na-button--secondary",
+        type: "button",
+        onClick: async () => {
+          const entries = watchlist.value
+            .split(/\r?\n/)
+            .map((value) => value.trim())
+            .filter(Boolean);
+          if (entries.length > MAIN_SHOP_LIMITS.maxWatchlistItems) {
+            setStatus(
+              this.status,
+              `Enter no more than ${MAIN_SHOP_LIMITS.maxWatchlistItems} item names. Nothing was saved.`,
+              "error",
+            );
+            return;
+          }
+          if (entries.some((value) => Array.from(value).length > SHOP_LIMITS.maxItemNameLength)) {
+            setStatus(
+              this.status,
+              `Each item name must be ${SHOP_LIMITS.maxItemNameLength} characters or fewer. Nothing was saved.`,
+              "error",
+            );
+            return;
+          }
+          this.settings.watchlist = sanitizeMainShopWatchlist(entries);
+          await this.saveSettings(
+            `Saved ${this.settings.watchlist.length} MS Autobuy watchlist item${this.settings.watchlist.length === 1 ? "" : "s"}.`,
+          );
+          this.render(container);
+        },
+      },
+      [icon("check"), "Save watchlist"],
+    );
+
+    const settingsPanel = element("section", { className: "na-pricing-settings" }, [
+      element("div", { className: "na-setting-row" }, [
+        element("div", {}, [
+          element("strong", { text: "Enable MS Autobuy" }),
+          element("span", {
+            text: "Off by default. Watches only Kauvara's Magic Shop and opens one exact haggle handoff.",
+          }),
+        ]),
+        element("label", { className: "na-switch", ariaLabel: "Enable MS Autobuy" }, [
+          enabled,
+          element("span", { className: "na-switch__track" }),
+        ]),
+      ]),
+      element("div", { className: "na-setting-row" }, [
+        element("div", {}, [
+          element("strong", { text: "Dry run" }),
+          element("span", {
+            text: "Detect and review a live match without leaving the shop page.",
+          }),
+        ]),
+        element("label", { className: "na-switch", ariaLabel: "Use MS Autobuy dry-run mode" }, [
+          dryRun,
+          element("span", { className: "na-switch__track" }),
+        ]),
+      ]),
+      element("div", { className: "na-field-grid" }, [
+        labeledControl(
+          "Maximum listed price (NP)",
+          maximumPrice,
+          "A hard ceiling before a haggle page can be opened.",
+        ),
+        labeledControl(
+          "Seconds between stock checks",
+          requestInterval,
+          "One authenticated page read at a time; minimum eight seconds.",
+        ),
+      ]),
+      element("div", { className: "na-watchlist-field" }, [
+        element("label", { className: "na-field__label" }, [
+          "Kauvara watchlist (one exact name per line)",
+          watchlist,
+          element("span", {
+            className: "na-field__hint",
+            text: `Up to ${MAIN_SHOP_LIMITS.maxWatchlistItems} names. Duplicates are removed.`,
+          }),
+        ]),
+        saveWatchlist,
+      ]),
+    ]);
+
+    this.status = element("div", {
+      className: "na-status",
+      role: "status",
+      ariaLive: "polite",
+      text: this.settings.enabled
+        ? "Ready. A match must pass a fresh stock check before its haggle page can open."
+        : "MS Autobuy is disabled.",
+    });
+    this.monitorStartButton = element(
+      "button",
+      {
+        className: "na-button na-button--primary",
+        type: "button",
+        disabled:
+          !this.settings.enabled || !onMagicShopPage || this.settings.watchlist.length === 0,
+        onClick: () => this.startMonitoring(),
+      },
+      [icon("search"), "Start monitoring"],
+    );
+    this.monitorStopButton = element(
+      "button",
+      {
+        className: "na-button na-button--secondary",
+        type: "button",
+        disabled: true,
+        onClick: () => this.stopMonitoring({ announce: true }),
+      },
+      [icon("close"), "Stop"],
+    );
+    this.monitorResultsRoot = element("div", { className: "na-watchlist-results" });
+    this.applyCandidates(onMagicShopPage ? extractMainShopCandidates(document) : []);
+
+    container.append(
+      element("div", { className: "na-section-heading" }, [
+        element("div", {}, [
+          element("h2", { text: "MS Autobuy" }),
+          element("p", {
+            text: "A live 10-item Kauvara watchlist with exact-name matching, a hard price ceiling, fresh-stock binding, and one safe haggle handoff.",
+          }),
+        ]),
+      ]),
+      settingsPanel,
+      element("div", { className: "na-notice na-notice--warning" }, [
+        icon("info"),
+        element("p", {
+          text: "Neopets requires the final offer and human verification on its haggle page. Neopian Assistant does not solve, click, or bypass that verification.",
+        }),
+      ]),
+      ...(!onMagicShopPage
+        ? [
+            element("div", { className: "na-notice" }, [
+              icon("shield"),
+              element("p", { text: "Open Kauvara's Magic Shop to monitor its live stock." }),
+              element(
+                "a",
+                { className: "na-button na-button--secondary", href: getMagicShopUrl() },
+                [icon("external"), "Open Kauvara"],
+              ),
+            ]),
+          ]
+        : []),
+      element("div", { className: "na-action-row" }, [
+        this.monitorStartButton,
+        this.monitorStopButton,
+      ]),
+      element("div", { className: "na-notice" }, [
+        icon("shield"),
+        element("p", {
+          text: "Monitoring is read-only, sequential, and active only while this dashboard tab remains open. An eligible match stops the monitor and opens an exact review.",
+        }),
+      ]),
+      this.monitorResultsRoot,
+      this.status,
+    );
+  }
+
+  applyCandidates(candidates) {
+    for (const itemName of this.settings.watchlist) {
+      const matches = candidates
+        .filter((candidate) => normalizeName(candidate.itemName) === normalizeName(itemName))
+        .sort((left, right) => left.price - right.price);
+      const candidate = matches[0] ?? null;
+      this.monitorResults.set(
+        itemName,
+        !candidate
+          ? { state: "not-found" }
+          : candidate.price <= this.settings.maximumPrice
+            ? { state: "ready", candidate }
+            : { state: "above-limit", candidate },
+      );
+    }
+    this.renderMonitorResults();
+  }
+
+  renderMonitorResults() {
+    if (!this.monitorResultsRoot) return;
+    this.monitorResultsRoot.replaceChildren();
+    if (this.settings.watchlist.length === 0) {
+      this.monitorResultsRoot.append(
+        element("p", {
+          className: "na-watchlist-empty",
+          text: "Save exact Kauvara item names to begin monitoring.",
+        }),
+      );
+      return;
+    }
+    this.monitorResultsRoot.append(
+      element("div", { className: "na-results-heading" }, [
+        element("strong", { text: "Kauvara watchlist" }),
+        element("span", {
+          text: this.monitoring
+            ? `Monitoring ${this.settings.watchlist.length} item${this.settings.watchlist.length === 1 ? "" : "s"}`
+            : `${this.settings.watchlist.length} saved`,
+        }),
+      ]),
+    );
+    for (const itemName of this.settings.watchlist) {
+      const result = this.monitorResults.get(itemName) ?? { state: "queued" };
+      let detail = "Waiting for a stock check.";
+      if (result.state === "checking") detail = "Checking Kauvara's live stock…";
+      if (result.state === "not-found") detail = "Not present in the latest stock page.";
+      if (result.state === "error") detail = result.error;
+      if (result.state === "ready") {
+        detail = `${formatPrice(result.candidate.price)} · ${result.candidate.stock} in stock · Ready to review.`;
+      }
+      if (result.state === "above-limit") {
+        detail = `${formatPrice(result.candidate.price)} · Above the ${formatPrice(this.settings.maximumPrice)} limit.`;
+      }
+      this.monitorResultsRoot.append(
+        element("div", { className: "na-watchlist-result" }, [
+          element("div", {}, [
+            element("strong", { text: itemName }),
+            element("span", { text: detail }),
+          ]),
+          element(
+            "button",
+            {
+              className: "na-button na-button--secondary na-button--small",
+              type: "button",
+              disabled: result.state !== "ready",
+              onClick: () => this.beginReview(result.candidate),
+            },
+            "Review",
+          ),
+        ]),
+      );
+    }
+  }
+
+  isMonitorActive(runId) {
+    return this.monitoring && this.monitorRunId === runId;
+  }
+
+  syncMonitorControls() {
+    if (this.monitorStartButton) this.monitorStartButton.disabled = this.monitoring;
+    if (this.monitorStopButton) this.monitorStopButton.disabled = !this.monitoring;
+  }
+
+  startMonitoring() {
+    if (
+      this.monitoring ||
+      !this.settings.enabled ||
+      !isKauvaraMagicShopUrl(window.location.href) ||
+      this.settings.watchlist.length === 0
+    ) {
+      return;
+    }
+    const runId = crypto.randomUUID();
+    this.monitoring = true;
+    this.monitorRunId = runId;
+    this.monitorResults = new Map(
+      this.settings.watchlist.map((itemName) => [itemName, { state: "queued" }]),
+    );
+    this.syncMonitorControls();
+    this.renderMonitorResults();
+    setStatus(
+      this.status,
+      `Monitoring ${this.settings.watchlist.length} exact Kauvara item${this.settings.watchlist.length === 1 ? "" : "s"}.`,
+      "running",
+    );
+    void this.runMonitor(runId);
+  }
+
+  async runMonitor(runId) {
+    while (this.isMonitorActive(runId)) {
+      try {
+        const authorization = await this.send({
+          type: MESSAGE_TYPES.authorizeMainShopLookup,
+          runId,
+          watchlist: [...this.settings.watchlist],
+        });
+        if (!this.isMonitorActive(runId)) return;
+        if (authorization.watchlistCount !== this.settings.watchlist.length) {
+          throw new Error("The authorized MS Autobuy watchlist no longer matches this tab.");
+        }
+        for (const itemName of this.settings.watchlist) {
+          this.monitorResults.set(itemName, { state: "checking" });
+        }
+        this.renderMonitorResults();
+        const controller = new AbortController();
+        this.monitorController = controller;
+        const html = await this.shopFetcher({ controller });
+        if (!this.isMonitorActive(runId)) return;
+        const candidates = parseMainShopCandidates(html);
+        this.applyCandidates(candidates);
+        const ready = this.settings.watchlist
+          .map((itemName) => this.monitorResults.get(itemName))
+          .find((result) => result?.state === "ready")?.candidate;
+        if (ready) {
+          this.stopMonitoring();
+          setStatus(
+            this.status,
+            `Found ${ready.itemName} at ${formatPrice(ready.price)}. Monitoring stopped for exact review.`,
+            "success",
+          );
+          this.openReviewDialog(ready);
+          return;
+        }
+        setStatus(
+          this.status,
+          `Stock check complete. Continuing every ${Math.round(this.settings.requestIntervalMs / 1000)} seconds.`,
+          "success",
+        );
+      } catch (error) {
+        if (!this.isMonitorActive(runId)) return;
+        for (const itemName of this.settings.watchlist) {
+          this.monitorResults.set(itemName, { state: "error", error: error.message });
+        }
+        this.renderMonitorResults();
+        this.stopMonitoring();
+        setStatus(this.status, `${error.message} Monitoring stopped safely.`, "error");
+        return;
+      } finally {
+        this.monitorController = null;
+      }
+    }
+  }
+
+  stopMonitoring({ announce = false } = {}) {
+    const runId = this.monitorRunId;
+    this.monitoring = false;
+    this.monitorRunId = null;
+    this.monitorController?.abort("cancelled");
+    this.monitorController = null;
+    this.syncMonitorControls();
+    this.renderMonitorResults();
+    if (runId) {
+      try {
+        Promise.resolve(
+          chrome.runtime.sendMessage({ type: MESSAGE_TYPES.cancelMainShopMonitor, runId }),
+        ).catch(() => undefined);
+      } catch {
+        // Local cancellation is complete even if the extension is reloading.
+      }
+    }
+    if (announce && this.status) {
+      setStatus(
+        this.status,
+        "MS Autobuy monitoring stopped. No haggle page was opened.",
+        "success",
+      );
+    }
+  }
+
+  beginReview(candidate) {
+    this.stopMonitoring({ announce: this.monitoring });
+    this.openReviewDialog(candidate);
+  }
+
+  openReviewDialog(candidate) {
+    if (!candidate || this.dialog) return;
+    const operationId = crypto.randomUUID();
+    const dialog = element("dialog", { className: "na-dialog" });
+    this.dialog = dialog;
+    const confirmation = element("input", { type: "checkbox" });
+    const actionButton = element("button", {
+      type: "button",
+      className: "na-button na-button--primary",
+      disabled: true,
+      text: this.settings.dryRun ? "Finish dry run" : "Open exact haggle page",
+    });
+    confirmation.addEventListener("change", () => {
+      actionButton.disabled = !confirmation.checked;
+    });
+    let submitting = false;
+    const close = ({ force = false } = {}) => {
+      if (submitting && !force) return;
+      dialog.close();
+    };
+    const closeButton = element(
+      "button",
+      { type: "button", className: "na-icon-button", ariaLabel: "Close", onClick: close },
+      icon("close"),
+    );
+    const cancelButton = element(
+      "button",
+      { type: "button", className: "na-button na-button--secondary", onClick: close },
+      "Cancel",
+    );
+    const setSubmitting = (value) => {
+      submitting = value;
+      confirmation.disabled = value;
+      closeButton.disabled = value;
+      cancelButton.disabled = value;
+      actionButton.disabled = value || !confirmation.checked;
+    };
+    dialog.addEventListener("cancel", (event) => {
+      if (submitting) event.preventDefault();
+    });
+    actionButton.addEventListener("click", async () => {
+      actionButton.disabled = true;
+      if (this.settings.dryRun) {
+        setStatus(
+          this.status,
+          `MS Autobuy dry run complete for ${candidate.itemName} at ${formatPrice(candidate.price)}. No haggle page was opened.`,
+          "success",
+        );
+        close({ force: true });
+        return;
+      }
+      setSubmitting(true);
+      try {
+        setStatus(this.status, "Rechecking the exact Kauvara listing…", "running");
+        const prepared = await this.send({
+          type: MESSAGE_TYPES.prepareMainShopHandoff,
+          operationId,
+          candidate,
+        });
+        const html = await this.shopFetcher();
+        const fresh = verifyFreshMainShopCandidate(html, candidate);
+        if (!fresh.fresh) throw new Error(fresh.error);
+        const responseFingerprint = await createTextFingerprint(html);
+        const confirmed = await this.send({
+          type: MESSAGE_TYPES.confirmMainShopHandoff,
+          operationId,
+          reviewId: prepared.reviewId,
+          candidate,
+          responseFingerprint,
+          freshStateVerified: true,
+        });
+        if (confirmed.haggleUrl !== candidate.haggleUrl) {
+          throw new Error("The authorized Kauvara haggle URL no longer matches this listing.");
+        }
+        setStatus(
+          this.status,
+          "Opening the exact Neopets haggle page. Complete the offer and human verification yourself.",
+          "running",
+        );
+        this.haggleNavigator(candidate, confirmed.haggleUrl);
+      } catch (error) {
+        setStatus(this.status, `${error.message} No automatic retry was attempted.`, "error");
+        setSubmitting(false);
+      }
+    });
+
+    dialog.append(
+      element("form", { method: "dialog", className: "na-dialog__card" }, [
+        element("div", { className: "na-dialog__header" }, [
+          element("div", {}, [
+            element("h2", {
+              text: this.settings.dryRun ? "Review MS dry run" : "Confirm haggle handoff",
+            }),
+            element("p", { text: "Kauvara's Magic Shop · quantity is one item." }),
+          ]),
+          closeButton,
+        ]),
+        element("dl", { className: "na-operation-summary" }, [
+          element("div", {}, [
+            element("dt", { text: "Item" }),
+            element("dd", { text: candidate.itemName }),
+          ]),
+          element("div", {}, [
+            element("dt", { text: "Listed price" }),
+            element("dd", { text: formatPrice(candidate.price) }),
+          ]),
+          element("div", {}, [
+            element("dt", { text: "Current stock" }),
+            element("dd", { text: String(candidate.stock) }),
+          ]),
+          element("div", {}, [
+            element("dt", { text: "Maximum" }),
+            element("dd", { text: formatPrice(this.settings.maximumPrice) }),
+          ]),
+        ]),
+        element("label", { className: "na-confirm-row" }, [
+          confirmation,
+          element("span", {
+            text: this.settings.dryRun
+              ? "I reviewed this live listing and understand that no navigation or purchase will occur."
+              : "I authorize one fresh-validated handoff to this exact listing. I will complete Neopets' haggle and human verification manually.",
+          }),
+        ]),
+        element("p", {
+          className: "na-dialog__note",
+          text: this.settings.dryRun
+            ? "Dry run mode sends no purchase or haggle request."
+            : "The extension opens one exact haggle URL. It does not submit an offer, click verification imagery, or retry.",
+        }),
+        element("div", { className: "na-dialog__actions" }, [cancelButton, actionButton]),
+      ]),
+    );
+    document.body.append(dialog);
+    dialog.addEventListener(
+      "close",
+      () => {
+        this.dialog = null;
+        dialog.remove();
+      },
+      { once: true },
+    );
+    dialog.showModal();
+    confirmation.focus();
+  }
+
+  cleanup() {
+    this.stopMonitoring();
+    this.dialog?.close();
+  }
+}

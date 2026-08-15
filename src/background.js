@@ -1,4 +1,18 @@
-import { MESSAGE_TYPES, PURCHASE_LIMITS, SHOP_LIMITS, STORAGE_KEYS } from "./shared/constants.js";
+import {
+  MAIN_SHOP_LIMITS,
+  MESSAGE_TYPES,
+  PURCHASE_LIMITS,
+  SHOP_LIMITS,
+  STORAGE_KEYS,
+} from "./shared/constants.js";
+import {
+  createMainShopFingerprint,
+  isActiveMainShopLock,
+  isDuplicateMainShopHandoff,
+  redactMainShopRecord,
+  validateMainShopHandoffRequest,
+  validateMainShopLookupRequest,
+} from "./shared/main-shop-operations.js";
 import {
   createPlanFingerprint,
   createShopUpdatePayload,
@@ -28,15 +42,19 @@ const CONFIRMATION_PREFIX = "neopianAssistant.runtime.confirmation.";
 const PURCHASE_LOCK_KEY = "neopianAssistant.runtime.purchaseLock";
 const PURCHASE_REVIEW_PREFIX = "neopianAssistant.runtime.purchaseReview.";
 const PURCHASE_CONFIRMATION_PREFIX = "neopianAssistant.runtime.purchaseConfirmation.";
+const MAIN_SHOP_LOCK_KEY = "neopianAssistant.runtime.mainShopLock";
+const MAIN_SHOP_REVIEW_PREFIX = "neopianAssistant.runtime.mainShopReview.";
 const EPHEMERAL_OPERATION_PREFIXES = Object.freeze([
   REVIEW_PREFIX,
   CONFIRMATION_PREFIX,
   PURCHASE_REVIEW_PREFIX,
   PURCHASE_CONFIRMATION_PREFIX,
+  MAIN_SHOP_REVIEW_PREFIX,
 ]);
 
 const cancelledRuns = new Set();
 const cancelledPurchaseMonitors = new Set();
+const cancelledMainShopMonitors = new Set();
 let lookupQueue = Promise.resolve();
 let operationQueue = Promise.resolve();
 
@@ -60,6 +78,10 @@ function validatePurchaseSender(sender) {
   return validateExtensionSender(sender, chrome.runtime.id, "purchase");
 }
 
+function validateMainShopSender(sender) {
+  return validateExtensionSender(sender, chrome.runtime.id, "mainShop");
+}
+
 function validateNeopetsSender(sender) {
   return validateExtensionSender(sender, chrome.runtime.id, "neopets");
 }
@@ -78,6 +100,15 @@ async function getPurchaseSettings() {
   const settings = data.settings.autoBuy;
   if (!data.settings.enabled || !settings.enabled) {
     throw userError("SW Autobuy is disabled in Neopian Assistant settings.");
+  }
+  return settings;
+}
+
+async function getMainShopSettings() {
+  const data = await loadAppData();
+  const settings = data.settings.mainShopBuy;
+  if (!data.settings.enabled || !settings.enabled) {
+    throw userError("MS Autobuy is disabled in Neopian Assistant settings.");
   }
   return settings;
 }
@@ -118,6 +149,20 @@ async function authorizePurchaseLookup(message) {
   return { ok: true, itemName: validation.itemName };
 }
 
+async function authorizeMainShopLookup(message) {
+  const settings = await getMainShopSettings();
+  const validation = validateMainShopLookupRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  if (cancelledMainShopMonitors.delete(validation.runId)) {
+    throw userError("The MS Autobuy monitor was stopped.");
+  }
+  await enforceLookupRate(settings.requestIntervalMs);
+  if (cancelledMainShopMonitors.delete(validation.runId)) {
+    throw userError("The MS Autobuy monitor was stopped.");
+  }
+  return { ok: true, watchlistCount: validation.watchlist.length };
+}
+
 function cancelRun(runId) {
   if (!isValidUuid(runId)) return { ok: false };
   cancelledRuns.add(runId);
@@ -130,6 +175,15 @@ function cancelPurchaseMonitor(runId) {
   cancelledPurchaseMonitors.add(runId);
   while (cancelledPurchaseMonitors.size > 100) {
     cancelledPurchaseMonitors.delete(cancelledPurchaseMonitors.values().next().value);
+  }
+  return { ok: true };
+}
+
+function cancelMainShopMonitor(runId) {
+  if (!isValidUuid(runId)) return { ok: false };
+  cancelledMainShopMonitors.add(runId);
+  while (cancelledMainShopMonitors.size > 100) {
+    cancelledMainShopMonitors.delete(cancelledMainShopMonitors.values().next().value);
   }
   return { ok: true };
 }
@@ -536,6 +590,107 @@ async function recordPurchaseVerification(message, sender) {
   return { ok: true };
 }
 
+async function readMainShopHistory() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.mainShopHistory);
+  return Array.isArray(stored[STORAGE_KEYS.mainShopHistory])
+    ? stored[STORAGE_KEYS.mainShopHistory]
+    : [];
+}
+
+async function appendMainShopRecord(record) {
+  const history = await readMainShopHistory();
+  const withoutDuplicate = history.filter((entry) => entry.operationId !== record.operationId);
+  withoutDuplicate.unshift(redactMainShopRecord(record));
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.mainShopHistory]: withoutDuplicate.slice(0, 20),
+  });
+}
+
+async function assertMainShopNotDuplicate(fingerprint) {
+  if (isDuplicateMainShopHandoff(await readMainShopHistory(), fingerprint)) {
+    throw userError(
+      "This exact Kauvara listing already opened recently. No duplicate haggle handoff was created.",
+    );
+  }
+}
+
+async function acquireMainShopLock(operationId, tabId) {
+  const stored = await chrome.storage.session.get(MAIN_SHOP_LOCK_KEY);
+  if (isActiveMainShopLock(stored[MAIN_SHOP_LOCK_KEY])) {
+    throw userError("Another MS Autobuy handoff is already active in a different tab.");
+  }
+  await chrome.storage.session.set({
+    [MAIN_SHOP_LOCK_KEY]: {
+      operationId,
+      tabId,
+      expiresAt: Date.now() + MAIN_SHOP_LIMITS.lockTtlMs,
+    },
+  });
+}
+
+async function prepareMainShopHandoff(message, sender) {
+  const settings = await getMainShopSettings();
+  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before a haggle handoff.");
+  const validation = validateMainShopHandoffRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  await pruneExpiredOperationState();
+  const fingerprint = await createMainShopFingerprint(validation.candidate);
+  await assertMainShopNotDuplicate(fingerprint);
+  await enforceLookupRate(settings.requestIntervalMs);
+  const reviewId = crypto.randomUUID();
+  await chrome.storage.session.set({
+    [`${MAIN_SHOP_REVIEW_PREFIX}${reviewId}`]: {
+      operationId: validation.operationId,
+      tabId: sender.tab.id,
+      candidateFingerprint: fingerprint,
+      expiresAt: Date.now() + MAIN_SHOP_LIMITS.reviewTtlMs,
+    },
+  });
+  return { ok: true, reviewId };
+}
+
+async function confirmMainShopHandoff(message, sender) {
+  if (!isValidUuid(message.reviewId) || !isTextFingerprint(message.responseFingerprint)) {
+    throw userError("The fresh MS Autobuy review proof is invalid.");
+  }
+  const settings = await getMainShopSettings();
+  if (settings.dryRun) throw userError("Disable MS Autobuy dry-run mode before a haggle handoff.");
+  const validation = validateMainShopHandoffRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const fingerprint = await createMainShopFingerprint(validation.candidate);
+  const reviewKey = `${MAIN_SHOP_REVIEW_PREFIX}${message.reviewId}`;
+  const stored = await chrome.storage.session.get(reviewKey);
+  const review = stored[reviewKey];
+  if (
+    message.freshStateVerified !== true ||
+    !isPlainObject(review) ||
+    review.expiresAt <= Date.now() ||
+    review.operationId !== validation.operationId ||
+    review.tabId !== sender.tab.id ||
+    review.candidateFingerprint !== fingerprint
+  ) {
+    throw userError("The fresh Kauvara review expired or no longer matches this listing.");
+  }
+  await assertMainShopNotDuplicate(fingerprint);
+  await acquireMainShopLock(validation.operationId, sender.tab.id);
+  try {
+    await appendMainShopRecord({
+      operationId: validation.operationId,
+      timestamp: Date.now(),
+      status: "opened",
+      fingerprint,
+    });
+    await chrome.storage.session.remove(reviewKey);
+    return { ok: true, haggleUrl: validation.candidate.haggleUrl };
+  } catch (error) {
+    const lock = (await chrome.storage.session.get(MAIN_SHOP_LOCK_KEY))[MAIN_SHOP_LOCK_KEY];
+    if (lock?.operationId === validation.operationId) {
+      await chrome.storage.session.remove(MAIN_SHOP_LOCK_KEY);
+    }
+    throw error;
+  }
+}
+
 async function routeMessage(message, sender) {
   if (!isPlainObject(message) || typeof message.type !== "string") {
     throw userError("Unexpected extension message.");
@@ -559,6 +714,14 @@ async function routeMessage(message, sender) {
       throw userError("SW Autobuy monitoring is only allowed on the Shop Wizard page.");
     }
     const task = lookupQueue.then(() => authorizePurchaseLookup(message));
+    lookupQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.authorizeMainShopLookup) {
+    if (!validateMainShopSender(sender)) {
+      throw userError("MS Autobuy monitoring is only allowed in Kauvara's Magic Shop.");
+    }
+    const task = lookupQueue.then(() => authorizeMainShopLookup(message));
     lookupQueue = task.catch(() => undefined);
     return task;
   }
@@ -633,6 +796,22 @@ async function routeMessage(message, sender) {
     operationQueue = task.catch(() => undefined);
     return task;
   }
+  if (message.type === MESSAGE_TYPES.prepareMainShopHandoff) {
+    if (!validateMainShopSender(sender)) {
+      throw userError("MS Autobuy handoffs are only allowed in Kauvara's Magic Shop.");
+    }
+    const task = operationQueue.then(() => prepareMainShopHandoff(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.confirmMainShopHandoff) {
+    if (!validateMainShopSender(sender)) {
+      throw userError("MS Autobuy handoffs are only allowed in Kauvara's Magic Shop.");
+    }
+    const task = operationQueue.then(() => confirmMainShopHandoff(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
   throw userError("Unexpected extension message type.");
 }
 
@@ -651,6 +830,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
     sendResponse(cancelPurchaseMonitor(message.runId));
+    return false;
+  }
+  if (message?.type === MESSAGE_TYPES.cancelMainShopMonitor) {
+    if (!validateMainShopSender(sender)) {
+      sendResponse({ ok: false, error: "MS monitoring can only stop in Kauvara's Magic Shop." });
+      return false;
+    }
+    sendResponse(cancelMainShopMonitor(message.runId));
     return false;
   }
   routeMessage(message, sender)
