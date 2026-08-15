@@ -41,6 +41,9 @@ debug/
 coverage/
 test-results/
 playwright-report/
+.playwright/
+.playwright-cli/
+output/
 .nyc_output/
 
 # Build caches and local release artifacts

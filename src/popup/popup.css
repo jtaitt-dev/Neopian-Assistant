@@ -1,0 +1,109 @@
+body {
+  margin: 0;
+  width: 360px;
+}
+
+#app {
+  padding: 18px;
+}
+
+.ui-brand {
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 14px;
+}
+
+.ui-brand img {
+  border-radius: 12px;
+}
+
+.ui-brand h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.ui-brand p {
+  color: var(--ui-muted);
+  font-size: 12px;
+  margin: 3px 0 0;
+}
+
+.popup-setting,
+.popup-current,
+.popup-privacy {
+  align-items: center;
+  border-bottom: 1px solid var(--ui-border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 0;
+}
+
+.popup-setting h2,
+.popup-current h2,
+.popup-privacy h2 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.popup-setting p,
+.popup-current p,
+.popup-privacy p {
+  color: var(--ui-muted);
+  font-size: 11px;
+  margin: 2px 0 0;
+}
+
+.popup-current,
+.popup-privacy {
+  justify-content: flex-start;
+}
+
+.popup-current__icon {
+  align-items: center;
+  background: var(--ui-surface-strong);
+  border-radius: 50%;
+  color: var(--ui-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.popup-actions {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0 0;
+}
+
+.popup-privacy {
+  margin-top: 14px;
+}
+
+.popup-privacy > .na-icon {
+  color: var(--ui-teal);
+}
+
+.popup-footer {
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  color: var(--ui-muted);
+  font-size: 10px;
+  margin-top: 8px;
+  padding: 9px;
+}
+
+.popup-failure {
+  padding: 20px;
+  text-align: center;
+}
+
+.popup-failure h1 {
+  font-size: 17px;
+}
+
+.popup-failure p {
+  color: var(--ui-muted);
+  font-size: 12px;
+}

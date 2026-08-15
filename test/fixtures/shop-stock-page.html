@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Synthetic Shop Stock Fixture</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        color: #172033;
+        background: #edf3f8;
+      }
+
+      header,
+      main {
+        width: min(920px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      header {
+        padding: 24px 0;
+      }
+
+      main {
+        padding: 28px;
+        border: 1px solid #ccd7e2;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 12px 40px rgb(30 50 80 / 8%);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #e5eaf0;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="header">
+      <a href="/userlookup.phtml?user=neopian_smoke_fixture">Synthetic profile</a>
+    </header>
+    <main>
+      <h1>Your Shop Stock</h1>
+      <p>This page is a credential-free local fixture used only for extension smoke testing.</p>
+      <form action="/process_market.phtml" method="post">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Current price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Smoke Test Apple</b></td>
+              <td>
+                <input type="hidden" name="obj_id_1" value="100001" />
+                <label>Price <input name="cost_1" value="1250" /></label>
+              </td>
+            </tr>
+            <tr>
+              <td><b>Smoke Test Berry</b></td>
+              <td>
+                <input type="hidden" name="obj_id_2" value="100002" />
+                <label>Price <input name="cost_2" value="2400" /></label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </form>
+    </main>
+  </body>
+</html>

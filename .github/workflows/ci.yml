@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "hotfix/**"
+      - "refactor/**"
+      - "docs/**"
+      - "test/**"
+      - "chore/**"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate pull-request branch name
+        if: github.event_name == 'pull_request'
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: npm run validate:branch -- "$BRANCH_NAME"
+
+      - name: Audit production and development dependencies
+        run: npm audit --audit-level=high
+
+      - name: Verify source, tests, build, manifest, icons, and secrets
+        run: npm run verify
+
+      - name: Build release archive
+        run: npm run package
+
+      - name: Upload unpacked extension and release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: neopian-assistant-7.12.0
+          path: |
+            dist/
+            release/neopian-assistant-7.12.0.zip
+          if-no-files-found: error
+          retention-days: 7

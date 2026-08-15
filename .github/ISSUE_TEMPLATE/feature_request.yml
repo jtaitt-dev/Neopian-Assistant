@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose an in-scope Neopian Assistant improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Neopian Assistant is a user-controlled Neopets productivity companion. Requests for CAPTCHA bypass, stealth automation, credential access, detection evasion, proxy rotation, or blind irreversible actions will not be accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the user-visible behavior, not only an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Product area
+      options:
+        - Dailies and progress
+        - Auto Pricing and shop tools
+        - Popup
+        - Options and privacy
+        - Accessibility or responsive UI
+        - Build, tests, or documentation
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety, privacy, and policy considerations
+      description:
+        Explain new data, permissions, network calls, automation, or consequential actions.
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label:
+            This request does not require credentials, cookies, CAPTCHA bypass, stealth, or
+            security-control circumvention.
+          required: true
+        - label:
+            I understand project-specific approval does not authorize another project or deployment.
+          required: true
