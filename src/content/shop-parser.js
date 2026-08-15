@@ -298,21 +298,39 @@ export function verifyFreshPurchaseCandidate(
   parser = new DOMParser(),
 ) {
   if (typeof responseText !== "string" || responseText.length === 0) {
-    return { fresh: false, error: "The fresh Shop Wizard response was empty." };
+    return { fresh: false, retryable: false, error: "The fresh Shop Wizard response was empty." };
   }
   const expected = sanitizePurchaseCandidate(expectedCandidate);
-  const match = parsePurchaseCandidates(responseText, expected?.itemName, parser).find(
+  if (!expected) {
+    return { fresh: false, retryable: false, error: "The selected shop listing is invalid." };
+  }
+  const candidates = parsePurchaseCandidates(responseText, expected.itemName, parser);
+  const match = candidates.find(
     (candidate) =>
-      expected &&
       candidate.itemName === expected.itemName &&
       candidate.owner === expected.owner &&
       candidate.objectId === expected.objectId &&
       candidate.price === expected.price &&
       candidate.purchaseUrl === expected.purchaseUrl,
   );
-  return match
-    ? { fresh: true, error: null }
-    : { fresh: false, error: "The selected shop listing changed or is no longer available." };
+  if (match) return { fresh: true, retryable: false, error: null };
+  const changedListing = candidates.some(
+    (candidate) =>
+      candidate.itemName === expected.itemName &&
+      candidate.owner === expected.owner &&
+      candidate.objectId === expected.objectId,
+  );
+  return changedListing
+    ? {
+        fresh: false,
+        retryable: false,
+        error: "The selected shop listing changed and the purchase was stopped.",
+      }
+    : {
+        fresh: false,
+        retryable: true,
+        error: "The selected shop listing was not returned in this Shop Wizard section.",
+      };
 }
 
 export function verifyPurchaseResponse(responseText, expectedCandidate, parser = new DOMParser()) {

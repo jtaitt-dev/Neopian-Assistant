@@ -14,9 +14,12 @@ import { AutoBuyController } from "./auto-buy.js";
 
 function formatRemaining(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const hours = Math.floor(seconds / 3600);
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return minutes > 0 ? `${minutes}m` : "less than 1m";
 }
 
 function buttonWithIcon(label, iconName, attributes = {}) {
@@ -56,6 +59,7 @@ export class NeopianAssistantApp {
     this.buying = null;
     this.closedForPage = false;
     this.dialogs = new Set();
+    this.pendingDailyClaims = new Set();
   }
 
   save() {
@@ -313,6 +317,12 @@ export class NeopianAssistantApp {
       }),
     );
     this.content.append(toolbar);
+    this.content.append(
+      element("p", {
+        className: "na-daily-help",
+        text: "Open a daily with Go, then press the check after the claim succeeds. Neopian Assistant will track when it becomes available again.",
+      }),
+    );
 
     if (this.editing) {
       this.content.append(
@@ -425,14 +435,35 @@ export class NeopianAssistantApp {
       if (image.parentElement)
         image.parentElement.dataset.initial = item.name.slice(0, 1).toUpperCase();
     });
+    const checkButton = element(
+      "button",
+      {
+        type: "button",
+        className: `na-check-button ${status.complete ? "na-check-button--complete" : ""}`,
+        ariaLabel: status.complete
+          ? `${item.name} is tracked and currently unavailable`
+          : `Mark ${item.name} claimed`,
+        title: status.complete ? statusText : "Mark claimed",
+        disabled: status.complete,
+        onClick: () => this.claimDaily(item),
+      },
+      icon("check"),
+    );
     const row = element(
       "article",
-      { className: `na-daily ${status.complete ? "na-daily--complete" : ""}` },
+      {
+        className: `na-daily ${status.complete ? "na-daily--complete" : ""}`,
+        dataset: { dailyId: item.id },
+      },
       [
         element("span", { className: "na-daily__icon-wrap" }, image),
         element("div", { className: "na-daily__main" }, [
           element("strong", { text: item.name }),
-          element("span", { className: "na-daily__status", text: statusText }),
+          element("span", {
+            className: "na-daily__status",
+            text: statusText,
+            dataset: { dailyStatus: item.id },
+          }),
         ]),
         element(
           "a",
@@ -443,17 +474,7 @@ export class NeopianAssistantApp {
           },
           [icon("external"), "Go"],
         ),
-        element(
-          "button",
-          {
-            type: "button",
-            className: `na-check-button ${status.complete ? "na-check-button--complete" : ""}`,
-            ariaLabel: status.complete ? `Reset ${item.name}` : `Mark ${item.name} complete`,
-            title: status.complete ? "Reset completion" : "Mark complete",
-            onClick: () => this.toggleDaily(item, status),
-          },
-          icon("check"),
-        ),
+        checkButton,
       ],
     );
     if (this.editing) {
@@ -509,38 +530,41 @@ export class NeopianAssistantApp {
 
   getStatusText(item, status) {
     if (status.availableAt && status.complete) {
-      return `Available in ${formatRemaining(status.availableAt - Date.now())}`;
+      return `Claimed · available in ${formatRemaining(status.availableAt - Date.now())}`;
     }
-    if (status.complete) return "Completed";
+    if (status.complete) return "Claimed";
     const cooldown = parseCooldown(item.cooldown);
     if (cooldown.type === "count" && status.count > 0)
-      return `${status.count} of ${status.limit} completed`;
+      return `${status.count} of ${status.limit} claimed · ready again`;
     return item.notes || "Ready";
   }
 
-  async toggleDaily(item, status) {
-    if (status.complete) {
-      this.data.state[item.id] = { completed: 0, lastCompleted: null, dateKey: null };
-      this.data.history = this.data.history.filter((entry) => entry.itemId !== item.id);
-      await this.save();
-      this.announce(`${item.name} was reset.`, "neutral");
-      this.renderActiveTab();
+  async claimDaily(item) {
+    if (this.pendingDailyClaims.has(item.id)) return;
+    const currentStatus = getDailyStatus(item, this.data.state[item.id]);
+    if (currentStatus.complete) {
+      this.announce(`${item.name} is already tracked until its cooldown ends.`, "neutral");
       return;
     }
-    const previous = this.data.state[item.id] ?? {
-      completed: 0,
-      lastCompleted: null,
-      dateKey: null,
-    };
-    const today = getNeopianDateKey();
-    const completed = previous.dateKey === today ? previous.completed + 1 : 1;
-    const timestamp = Date.now();
-    this.data.state[item.id] = { completed, lastCompleted: timestamp, dateKey: today };
-    this.data.history.unshift({ itemId: item.id, timestamp });
-    this.data.history = this.data.history.slice(0, 100);
-    await this.save();
-    this.announce(`${item.name} marked complete.`, "success");
-    this.renderActiveTab();
+    this.pendingDailyClaims.add(item.id);
+    try {
+      const previous = this.data.state[item.id] ?? {
+        completed: 0,
+        lastCompleted: null,
+        dateKey: null,
+      };
+      const today = getNeopianDateKey();
+      const completed = previous.dateKey === today ? previous.completed + 1 : 1;
+      const timestamp = Date.now();
+      this.data.state[item.id] = { completed, lastCompleted: timestamp, dateKey: today };
+      this.data.history.unshift({ itemId: item.id, timestamp });
+      this.data.history = this.data.history.slice(0, 100);
+      await this.save();
+      this.announce(`${item.name} claim tracked.`, "success");
+      this.renderActiveTab();
+    } finally {
+      this.pendingDailyClaims.delete(item.id);
+    }
   }
 
   createProgressSummary() {
@@ -557,7 +581,7 @@ export class NeopianAssistantApp {
       ),
       element("div", {}, [
         element("strong", { text: "Today's progress" }),
-        element("span", { text: `${percent}% manually marked complete` }),
+        element("span", { text: `${percent}% currently on cooldown` }),
         element("progress", { value: completed, max: Math.max(1, items.length) }),
       ]),
     ]);

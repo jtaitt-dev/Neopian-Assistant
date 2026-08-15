@@ -475,6 +475,13 @@
   color: var(--na-teal);
 }
 
+.na-daily-help {
+  color: var(--na-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
 .na-check-button {
   align-items: center;
   background: var(--na-bg);
@@ -492,6 +499,11 @@
   background: var(--na-teal);
   border-color: var(--na-teal);
   color: #ffffff;
+}
+
+.na-check-button:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .na-daily__edit-controls {

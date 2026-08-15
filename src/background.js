@@ -333,11 +333,53 @@ async function preparePurchase(message, sender) {
       operationId: validation.operationId,
       tabId: sender.tab.id,
       candidateFingerprint: fingerprint,
+      freshLookupCount: 1,
       responseFingerprint: null,
       expiresAt: Date.now() + PURCHASE_LIMITS.reviewTtlMs,
     },
   });
   return { ok: true, reviewId };
+}
+
+async function authorizePurchaseRecheck(message, sender) {
+  if (!isValidUuid(message.reviewId)) throw userError("The purchase review identifier is invalid.");
+  const settings = await getPurchaseSettings();
+  if (settings.dryRun) throw userError("Disable SW Autobuy dry-run mode before a real purchase.");
+  const validation = validatePurchaseRequest(message, settings);
+  if (!validation.valid) throw userError(validation.error);
+  const candidateFingerprint = await createPurchaseFingerprint(validation.candidate);
+  const reviewKey = `${PURCHASE_REVIEW_PREFIX}${message.reviewId}`;
+  const stored = await chrome.storage.session.get(reviewKey);
+  const review = stored[reviewKey];
+  if (
+    !isPlainObject(review) ||
+    review.expiresAt <= Date.now() ||
+    review.operationId !== validation.operationId ||
+    review.tabId !== sender.tab.id ||
+    review.candidateFingerprint !== candidateFingerprint ||
+    review.responseFingerprint !== null ||
+    !Number.isSafeInteger(review.freshLookupCount) ||
+    review.freshLookupCount < 1 ||
+    review.freshLookupCount >= PURCHASE_LIMITS.freshLookupAttempts
+  ) {
+    throw userError("The fresh purchase review expired or cannot authorize another lookup.");
+  }
+  await enforceLookupRate(SHOP_LIMITS.minLookupIntervalMs);
+  const refreshed = (await chrome.storage.session.get(reviewKey))[reviewKey];
+  if (
+    !isPlainObject(refreshed) ||
+    refreshed.expiresAt <= Date.now() ||
+    refreshed.operationId !== review.operationId ||
+    refreshed.tabId !== review.tabId ||
+    refreshed.candidateFingerprint !== review.candidateFingerprint ||
+    refreshed.responseFingerprint !== null ||
+    refreshed.freshLookupCount !== review.freshLookupCount
+  ) {
+    throw userError("The fresh purchase review expired while waiting for the next lookup.");
+  }
+  const freshLookupCount = refreshed.freshLookupCount + 1;
+  await chrome.storage.session.set({ [reviewKey]: { ...refreshed, freshLookupCount } });
+  return { ok: true, itemName: validation.candidate.itemName, freshLookupCount };
 }
 
 async function bindPurchaseReview(message, sender) {
@@ -552,6 +594,14 @@ async function routeMessage(message, sender) {
     if (!validatePurchaseSender(sender))
       throw userError("SW Autobuy is only allowed on a Shop Wizard results page.");
     const task = operationQueue.then(() => preparePurchase(message, sender));
+    operationQueue = task.catch(() => undefined);
+    return task;
+  }
+  if (message.type === MESSAGE_TYPES.authorizePurchaseRecheck) {
+    if (!validatePurchaseSender(sender)) {
+      throw userError("SW Autobuy is only allowed on a Shop Wizard results page.");
+    }
+    const task = operationQueue.then(() => authorizePurchaseRecheck(message, sender));
     operationQueue = task.catch(() => undefined);
     return task;
   }

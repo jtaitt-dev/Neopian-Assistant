@@ -13,6 +13,8 @@ const candidate = {
     "https://www.neopets.com/browseshop.phtml?owner=safe_owner&buy_obj_info_id=123456&buy_cost_neopoints=25",
 };
 
+const matchingWizardHtml = `<div class="wizard-results-grid-shop"><li class="wizard-results-grid-header">Shop Owner Stock Price</li><li><a href="${candidate.purchaseUrl}"><span>safe_owner</span><span>1</span><span class="wizard-results-price">25 NP</span></a></li></div>`;
+
 function installDom() {
   const { document, window } = parseHTML("<!doctype html><html><body></body></html>");
   const originalCreateElement = document.createElement.bind(document);
@@ -269,6 +271,126 @@ test("SW Autobuy keeps an active purchase review visible until its request settl
     globalThis.document = previous.document;
     globalThis.window = previous.window;
     globalThis.Node = previous.Node;
+  }
+});
+
+test("SW Autobuy finds a confirmed listing across all eight sections and purchases exactly once", async () => {
+  const previous = {
+    document: globalThis.document,
+    window: globalThis.window,
+    Node: globalThis.Node,
+    DOMParser: globalThis.DOMParser,
+  };
+  const dom = installDom();
+  globalThis.document = dom.document;
+  globalThis.window = dom.window;
+  globalThis.Node = dom.window.Node;
+  globalThis.DOMParser = dom.window.DOMParser;
+  let wizardFetches = 0;
+  let purchaseFetches = 0;
+  const messages = [];
+  try {
+    const controller = new AutoBuyController({
+      data: { settings: { autoBuy: { enabled: true, dryRun: false, maximumPrice: 1000 } } },
+      save: async () => undefined,
+      announce: () => undefined,
+      wizardFetcher: async () => {
+        wizardFetches += 1;
+        return wizardFetches === 8 ? matchingWizardHtml : "<main>No matching section.</main>";
+      },
+      purchaseFetcher: async () => {
+        purchaseFetches += 1;
+        return "<main>Healing Potion I. Your purchase has been successful!</main>";
+      },
+    });
+    controller.status = document.createElement("div");
+    controller.send = async (message) => {
+      messages.push(message.type);
+      if (message.type === "shop.preparePurchase")
+        return { ok: true, reviewId: crypto.randomUUID() };
+      if (message.type === "shop.authorizePurchaseRecheck") {
+        return {
+          ok: true,
+          itemName: candidate.itemName,
+          freshLookupCount: messages.filter((type) => type === message.type).length + 1,
+        };
+      }
+      if (message.type === "shop.confirmPurchase") return { ok: true, token: crypto.randomUUID() };
+      if (message.type === "shop.purchaseItem")
+        return { ok: true, purchaseUrl: candidate.purchaseUrl };
+      return { ok: true };
+    };
+    controller.openReviewDialog(candidate);
+    await confirmDialog(document, "Buy one item");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(wizardFetches, 8);
+    assert.equal(messages.filter((type) => type === "shop.authorizePurchaseRecheck").length, 7);
+    assert.equal(messages.filter((type) => type === "shop.purchaseItem").length, 1);
+    assert.equal(purchaseFetches, 1);
+    assert.match(controller.status.textContent, /Verified purchase of one/i);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+    globalThis.Node = previous.Node;
+    globalThis.DOMParser = previous.DOMParser;
+  }
+});
+
+test("SW Autobuy stops after eight missing sections without sending a purchase", async () => {
+  const previous = {
+    document: globalThis.document,
+    window: globalThis.window,
+    Node: globalThis.Node,
+    DOMParser: globalThis.DOMParser,
+  };
+  const dom = installDom();
+  globalThis.document = dom.document;
+  globalThis.window = dom.window;
+  globalThis.Node = dom.window.Node;
+  globalThis.DOMParser = dom.window.DOMParser;
+  let wizardFetches = 0;
+  let purchaseFetches = 0;
+  const messages = [];
+  try {
+    const controller = new AutoBuyController({
+      data: { settings: { autoBuy: { enabled: true, dryRun: false, maximumPrice: 1000 } } },
+      save: async () => undefined,
+      announce: () => undefined,
+      wizardFetcher: async () => {
+        wizardFetches += 1;
+        return "<main>No matching section.</main>";
+      },
+      purchaseFetcher: async () => {
+        purchaseFetches += 1;
+        return "";
+      },
+    });
+    controller.status = document.createElement("div");
+    controller.send = async (message) => {
+      messages.push(message.type);
+      if (message.type === "shop.preparePurchase")
+        return { ok: true, reviewId: crypto.randomUUID() };
+      if (message.type === "shop.authorizePurchaseRecheck") {
+        return {
+          ok: true,
+          itemName: candidate.itemName,
+          freshLookupCount: messages.filter((type) => type === message.type).length + 1,
+        };
+      }
+      return { ok: true };
+    };
+    controller.openReviewDialog(candidate);
+    await confirmDialog(document, "Buy one item");
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(wizardFetches, 8);
+    assert.equal(messages.includes("shop.purchaseItem"), false);
+    assert.equal(purchaseFetches, 0);
+    assert.match(controller.status.textContent, /All 8 Shop Wizard sections were checked safely/i);
+  } finally {
+    globalThis.document = previous.document;
+    globalThis.window = previous.window;
+    globalThis.Node = previous.Node;
+    globalThis.DOMParser = previous.DOMParser;
   }
 });
 

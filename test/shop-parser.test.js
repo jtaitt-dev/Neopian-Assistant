@@ -281,6 +281,24 @@ test("Shop Wizard purchase parsing requires visible and URL prices to match", ()
     ).fresh,
     false,
   );
+  assert.equal(
+    verifyFreshPurchaseCandidate(
+      wizardPurchaseHtml
+        .replaceAll("25 NP", "26 NP")
+        .replaceAll("buy_cost_neopoints=25", "buy_cost_neopoints=26"),
+      purchaseCandidate,
+      parser(),
+    ).retryable,
+    false,
+  );
+  assert.equal(
+    verifyFreshPurchaseCandidate(
+      "<main>No result in this market section.</main>",
+      purchaseCandidate,
+      parser(),
+    ).retryable,
+    true,
+  );
 });
 
 test("SW Autobuy parses monitored response HTML against the requested exact item name", () => {

@@ -99,3 +99,67 @@ test("an invalidated extension context removes stale UI without an unhandled sav
   );
   assert.equal(isExtensionContextInvalidatedError(new Error("ordinary storage failure")), false);
 });
+
+test("daily claims start cooldown tracking and cannot be double-counted while unavailable", async () => {
+  const item = {
+    id: "daily-test",
+    name: "Test Daily",
+    cooldown: "daily",
+  };
+  const data = {
+    state: {},
+    history: [],
+    settings: { autoPricing: { enabled: false } },
+  };
+  const persisted = [];
+  const announcements = [];
+  const app = new NeopianAssistantApp(data, {
+    persistData: async (snapshot) => {
+      persisted.push(snapshot);
+      return snapshot;
+    },
+  });
+  app.announce = (message) => announcements.push(message);
+  app.renderActiveTab = () => undefined;
+
+  await app.claimDaily(item);
+  await app.claimDaily(item);
+
+  assert.equal(data.state[item.id].completed, 1);
+  assert.equal(data.history.length, 1);
+  assert.equal(persisted.length, 1);
+  assert.match(announcements[0], /claim tracked/i);
+  assert.match(announcements[1], /already tracked/i);
+});
+
+test("count-based daily claims remain ready until their daily limit is reached", async () => {
+  const item = {
+    id: "daily-count-test",
+    name: "Count Test",
+    cooldown: "2/day",
+  };
+  const data = {
+    state: {},
+    history: [],
+    settings: { autoPricing: { enabled: false } },
+  };
+  const app = new NeopianAssistantApp(data, { persistData: async (snapshot) => snapshot });
+  app.announce = () => undefined;
+  app.renderActiveTab = () => undefined;
+
+  await app.claimDaily(item);
+  assert.match(
+    app.getStatusText(item, {
+      complete: false,
+      availableAt: null,
+      count: 1,
+      limit: 2,
+    }),
+    /1 of 2 claimed.*ready again/i,
+  );
+  await app.claimDaily(item);
+  await app.claimDaily(item);
+
+  assert.equal(data.state[item.id].completed, 2);
+  assert.equal(data.history.length, 2);
+});

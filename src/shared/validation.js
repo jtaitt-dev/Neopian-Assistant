@@ -329,6 +329,38 @@ export function getNeopianDateKey(date = new Date()) {
   return `${map.year}-${map.month}-${map.day}`;
 }
 
+const NEOPIAN_RESET_SEARCH = Object.freeze({
+  daily: 36 * 60 * 60 * 1000,
+  monthly: 40 * 24 * 60 * 60 * 1000,
+});
+const neopianResetCache = new Map();
+
+function getNeopianPeriodKey(timestamp, period) {
+  const dateKey = getNeopianDateKey(new Date(timestamp));
+  return period === "monthly" ? dateKey.slice(0, 7) : dateKey;
+}
+
+export function getNextNeopianResetTimestamp(now = Date.now(), period = "daily") {
+  if (!Number.isSafeInteger(now) || now < 0 || !Object.hasOwn(NEOPIAN_RESET_SEARCH, period)) {
+    return null;
+  }
+  const currentKey = getNeopianPeriodKey(now, period);
+  const cacheKey = `${period}:${currentKey}`;
+  const cached = neopianResetCache.get(cacheKey);
+  if (Number.isSafeInteger(cached) && cached > now) return cached;
+
+  let lower = now;
+  let upper = now + NEOPIAN_RESET_SEARCH[period];
+  if (getNeopianPeriodKey(upper, period) === currentKey) return null;
+  while (upper - lower > 1) {
+    const midpoint = lower + Math.floor((upper - lower) / 2);
+    if (getNeopianPeriodKey(midpoint, period) === currentKey) lower = midpoint;
+    else upper = midpoint;
+  }
+  neopianResetCache.set(cacheKey, upper);
+  return upper;
+}
+
 export function getDailyStatus(item, state, now = Date.now()) {
   const cooldown = parseCooldown(item.cooldown);
   const safeState = sanitizeCompletionState(state);
@@ -336,7 +368,13 @@ export function getDailyStatus(item, state, now = Date.now()) {
   const sameDay = safeState.dateKey === today;
   if (cooldown.type === "timer") {
     const availableAt = (safeState.lastCompleted ?? 0) + cooldown.durationMs;
-    return { complete: availableAt > now, availableAt, count: safeState.completed, limit: 1 };
+    const complete = availableAt > now;
+    return {
+      complete,
+      availableAt: complete ? availableAt : null,
+      count: complete ? 1 : 0,
+      limit: 1,
+    };
   }
   if (cooldown.period === "daily" && !sameDay) {
     return { complete: false, availableAt: null, count: 0, limit: cooldown.limit };
@@ -344,9 +382,12 @@ export function getDailyStatus(item, state, now = Date.now()) {
   if (cooldown.period === "monthly" && safeState.dateKey?.slice(0, 7) !== today.slice(0, 7)) {
     return { complete: false, availableAt: null, count: 0, limit: 1 };
   }
+  const complete = safeState.completed >= cooldown.limit;
   return {
-    complete: safeState.completed >= cooldown.limit,
-    availableAt: null,
+    complete,
+    availableAt: complete
+      ? getNextNeopianResetTimestamp(now, cooldown.period === "monthly" ? "monthly" : "daily")
+      : null,
     count: safeState.completed,
     limit: cooldown.limit,
   };

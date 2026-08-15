@@ -16,10 +16,18 @@ function formatPrice(value) {
 }
 
 export class AutoBuyController {
-  constructor({ data, save, announce }) {
+  constructor({
+    data,
+    save,
+    announce,
+    wizardFetcher = fetchWizardHtml,
+    purchaseFetcher = fetchPurchaseHtml,
+  }) {
     this.data = data;
     this.save = save;
     this.announce = announce;
+    this.wizardFetcher = wizardFetcher;
+    this.purchaseFetcher = purchaseFetcher;
     this.status = null;
     this.dialog = null;
     this.monitoring = false;
@@ -46,6 +54,38 @@ export class AutoBuyController {
   async saveSettings(message) {
     await this.save();
     this.announce(message, "success");
+  }
+
+  async recheckPurchaseCandidate({ candidate, operationId, reviewId }) {
+    let lastFreshState = null;
+    for (let attempt = 1; attempt <= PURCHASE_LIMITS.freshLookupAttempts; attempt += 1) {
+      if (attempt > 1) {
+        setStatus(
+          this.status,
+          `Checking Shop Wizard section ${attempt} of ${PURCHASE_LIMITS.freshLookupAttempts} for the exact listing…`,
+          "running",
+        );
+        const authorization = await this.send({
+          type: MESSAGE_TYPES.authorizePurchaseRecheck,
+          operationId,
+          reviewId,
+          candidate,
+        });
+        if (
+          authorization.itemName !== candidate.itemName ||
+          authorization.freshLookupCount !== attempt
+        ) {
+          throw new Error("The Shop Wizard recheck authorization did not match this listing.");
+        }
+      }
+      const freshWizardHtml = await this.wizardFetcher(candidate.itemName);
+      lastFreshState = verifyFreshPurchaseCandidate(freshWizardHtml, candidate);
+      if (lastFreshState.fresh) return freshWizardHtml;
+      if (!lastFreshState.retryable) throw new Error(lastFreshState.error);
+    }
+    throw new Error(
+      `${lastFreshState?.error || "The selected shop listing was not found."} All ${PURCHASE_LIMITS.freshLookupAttempts} Shop Wizard sections were checked safely.`,
+    );
   }
 
   render(container) {
@@ -544,9 +584,11 @@ export class AutoBuyController {
           operationId,
           candidate,
         });
-        const freshWizardHtml = await fetchWizardHtml(candidate.itemName);
-        const freshState = verifyFreshPurchaseCandidate(freshWizardHtml, candidate);
-        if (!freshState.fresh) throw new Error(freshState.error);
+        const freshWizardHtml = await this.recheckPurchaseCandidate({
+          candidate,
+          operationId,
+          reviewId: review.reviewId,
+        });
         const responseFingerprint = await createTextFingerprint(freshWizardHtml);
         await this.send({
           type: MESSAGE_TYPES.bindPurchaseReview,
@@ -580,7 +622,7 @@ export class AutoBuyController {
         if (execution.purchaseUrl !== candidate.purchaseUrl) {
           throw new Error("The authorized purchase URL no longer matches this listing.");
         }
-        const purchaseHtml = await fetchPurchaseHtml(candidate);
+        const purchaseHtml = await this.purchaseFetcher(candidate);
         const verification = verifyPurchaseResponse(purchaseHtml, candidate);
         await this.send({
           type: MESSAGE_TYPES.recordPurchaseVerification,

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateSuggestedPrice,
   getDailyStatus,
+  getNextNeopianResetTimestamp,
   isAllowedItemIconUrl,
   isAllowedNeopetsPageUrl,
   isOwnShopStockUrl,
@@ -154,6 +155,31 @@ test("cooldown parsing and daily state honor count and timer rules", () => {
     ).complete,
     false,
   );
+  const summerNow = Date.UTC(2026, 6, 18, 8, 0);
+  assert.equal(
+    getDailyStatus(
+      { cooldown: "daily" },
+      { completed: 1, lastCompleted: summerNow, dateKey: "2026-07-18" },
+      summerNow,
+    ).availableAt,
+    Date.UTC(2026, 6, 19, 7, 0),
+  );
+  assert.equal(
+    getDailyStatus(
+      { cooldown: "monthly" },
+      { completed: 1, lastCompleted: summerNow, dateKey: "2026-07-18" },
+      summerNow,
+    ).availableAt,
+    Date.UTC(2026, 7, 1, 7, 0),
+  );
+  const beforeSpringForward = Date.UTC(2026, 2, 8, 8, 0);
+  assert.equal(
+    getNextNeopianResetTimestamp(beforeSpringForward, "daily"),
+    Date.UTC(2026, 2, 9, 7, 0),
+  );
+  const beforeFallBack = Date.UTC(2026, 10, 1, 7, 0);
+  assert.equal(getNextNeopianResetTimestamp(beforeFallBack, "daily"), Date.UTC(2026, 10, 2, 8, 0));
+  assert.equal(getNextNeopianResetTimestamp(now, "unsupported"), null);
 });
 
 test("purchase candidates bind one positive price to an exact Neopets shop URL", () => {
