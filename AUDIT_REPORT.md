@@ -1,8 +1,8 @@
 # Neopian Assistant Production Audit
 
-Audit date: 2026-07-18
+Audit date: 2026-08-15
 
-Audited release: 7.10.0
+Audited release: 7.11.0
 
 Manifest version: 3
 
@@ -35,27 +35,29 @@ progress, disabled-startup reactivation, a three-tab layout assumption, two real
 response differences, and dashboard settings buttons that called an API unavailable to content
 scripts.
 
-The 7.10.0 source suite extends the previously validated production build with a bounded live SW
-Autobuy watchlist. Authenticated installed-build validation confirmed dailies navigation/manual
-state, settings persistence, the repaired settings route, and a complete no-purchase SW Autobuy dry
-run without exposing account identity. Initial Auto Pricing scans failed closed because
-service-worker requests did not receive authenticated Wizard results. Moving the bounded read-only
-fetch to the authenticated same-origin Neopets content context exposed a second live-markup defect:
-own-stock parsing selected the bold quantity cell instead of the first-cell image label. The
-repaired dry run then passed, while the first authorized real attempt stopped before submission
-because its final worker-origin stock GET lacked the page session. The original price remained
-unchanged. Bounded same-origin Wizard reads and exact worker-authorized mutation transports preserve
-that authority boundary. Fresh own-stock validation now uses a short-lived hidden same-origin frame
-because Neopets returns only an authenticated shell to programmatic GETs and hydrates stock rows
-with its page scripts. The worker retains sender/page/settings/plan/rate/fingerprint/token/lock
-authority. The live process endpoint is also corrected. The authenticated 7.10.0 SW Autobuy monitor,
-ceiling, persistence, and no-purchase dry run passed after reload. Its review transition exposed a
-truthful-status defect, and a final source trace found that in-flight consequential dialogs could be
-dismissed before their requests settled. Those review-lifecycle defects and the hydrated-stock gate
-are repaired in the current 74-test build. A focused installed-build retest confirmed truthful
-monitor-stop status before review, no-purchase dry run completion, dashboard-tab cancellation,
-restored settings after reload, single-root mounting, and no extension console error or warning; no
-privileged-URL or Windows-access bypass was attempted.
+The 7.11.0 source suite extends the previously validated production build with dynamic daily claim
+cooldowns and a bounded live SW Autobuy watchlist. Authenticated installed-build validation
+confirmed dailies navigation/manual state, settings persistence, the repaired settings route, and a
+complete no-purchase SW Autobuy dry run without exposing account identity. Initial Auto Pricing
+scans failed closed because service-worker requests did not receive authenticated Wizard results.
+Moving the bounded read-only fetch to the authenticated same-origin Neopets content context exposed
+a second live-markup defect: own-stock parsing selected the bold quantity cell instead of the
+first-cell image label. The repaired dry run then passed, while the first authorized real attempt
+stopped before submission because its final worker-origin stock GET lacked the page session. The
+original price remained unchanged. Bounded same-origin Wizard reads and exact worker-authorized
+mutation transports preserve that authority boundary. Fresh own-stock validation now uses a
+short-lived hidden same-origin frame because Neopets returns only an authenticated shell to
+programmatic GETs and hydrates stock rows with its page scripts. The worker retains
+sender/page/settings/plan/rate/fingerprint/token/lock authority. The live process endpoint is also
+corrected. The authenticated 7.10.0 SW Autobuy monitor, ceiling, persistence, and no-purchase dry
+run passed after reload. Its review transition exposed a truthful-status defect, and a final source
+trace found that in-flight consequential dialogs could be dismissed before their requests settled.
+Those review-lifecycle defects and the hydrated-stock gate are repaired in the current 78-test
+build. A focused installed-build retest confirmed truthful monitor-stop status before review,
+no-purchase dry run completion, dashboard-tab cancellation, restored settings after reload,
+single-root mounting, and no extension console error or warning. The 7.11.0 installed build also
+passed a real no-spend daily claim and dynamic cooldown persistence check after an exact extension
+reload through bounded Windows UI Automation; no privileged-URL or profile-access bypass was used.
 
 ## Scope and method
 
@@ -130,6 +132,8 @@ executable code, or developer server exists.
 | CI release artifact still targeted 7.8.0                         | Workflow artifact name and archive path were hard-coded and missed both later version updates                                         | CI now uploads `dist/` with the exact 7.10.0 release archive; a regression binds both workflow paths to the manifest/package version.                                                                                   | Manifest/build-metadata test plus local package inspection.                                    |
 | Pricing run messages accepted non-UUID identifiers               | Lookup and cancellation schemas allowed any short string while the controller always generated UUIDs                                  | Both routes now require canonical UUIDs, matching consequential operation and SW Autobuy monitor identifiers.                                                                                                           | Pricing lookup schema regression plus route source trace.                                      |
 | Expired review tokens accumulated in session storage             | Expiry was checked on use but failed pre-submit reviews were not removed                                                              | Before each new pricing or purchase review, expired/malformed review and confirmation keys are removed while active and unrelated state is preserved.                                                                   | Runtime-state pruning regression.                                                              |
+| Fresh purchase check depended on one rotating Wizard section     | A valid exact listing may be absent from any single Shop Wizard response because results rotate across eight market sections          | Fresh validation now checks at most eight independently rate-authorized sections. Exact identity/price changes abort immediately; all-section misses fail closed; the purchase URL is still followed at most once.      | Eight-section success/miss controller tests and changed-listing parser tests.                  |
+| Completed daily could erase its own cooldown                     | Pressing the completed check a second time immediately cleared state and history                                                      | Claimed controls remain disabled until their daily, monthly, per-day, or elapsed cooldown expires; guarded claim handling rejects duplicate clicks.                                                                     | Claim idempotency, per-day count, reset-boundary, and daylight-saving tests.                   |
 
 ### Low / UX
 
@@ -177,8 +181,10 @@ executable code, or developer server exists.
 4. **Quantity and ceiling:** quantity is hard-coded to one; no quantity parameter is accepted; price
    must be positive and no higher than the sanitized configured maximum.
 5. **Dry run:** the default flow presents the exact item/price/maximum and follows no purchase URL.
-6. **Fresh gate:** a fixed exact Wizard search is repeated; the same listing must still appear with
-   the same item, owner, object ID, price, and canonical URL.
+6. **Fresh gate:** at most eight independently worker-authorized and globally paced exact Wizard
+   reads cover the rotating market sections. The same listing must reappear with the same item,
+   owner, object ID, price, and canonical URL. A changed identity/price aborts immediately; a miss
+   across all eight sections fails closed.
 7. **Confirmation/locking:** a response fingerprint, candidate fingerprint, tab/page binding,
    operation UUID, 30-second token, and global purchase lock are required.
 8. **Duplicate prevention:** running, pending-verification, verified, or uncertain fingerprints
@@ -192,16 +198,17 @@ executable code, or developer server exists.
 
 ## Dailies audit
 
-- Navigation and completion remain deliberately separate; **Go** never marks success.
+- Navigation and claim tracking remain deliberately separate; **Go** never marks success.
 - All default/custom URLs are HTTPS `www.neopets.com`; official image URLs require exact
   `https://images.neopets.com` origin.
-- Daily/count/manual state uses the Neopian LA date boundary; monthly state compares year/month;
-  timers compare the last completion timestamp and elapsed duration.
-- Local marks are explicit and bounded. Multiple tabs converge through sanitized storage-change
-  handling rather than sending account mutations.
+- Daily/count/manual state uses the Neopian LA date boundary; monthly state counts down to the next
+  month; timers compare the last claim timestamp and elapsed duration. Daily and monthly reset
+  timestamps are calculated across daylight-saving transitions.
+- Local claims are explicit, bounded, and idempotent while unavailable. Multiple tabs converge
+  through sanitized storage-change handling rather than sending account mutations.
 - No daily destination action is automated or falsely verified. Layout changes at destination pages
-  therefore cannot create a false completion; the user remains responsible for marking completion.
-- Live daily navigation, manual completion/reset, and reload persistence were verified and restored.
+  therefore cannot create a false claim; the user remains responsible for marking a successful claim
+  with the separate check control.
 
 ## Security, privacy, and permission review
 
@@ -242,11 +249,11 @@ executable code, or developer server exists.
 - All source JavaScript: `node --check` passed.
 - `npm run verify`: formatting, Biome, Node tests, production build, Manifest/file/icon/CSP/API
   validation, and secret scan passed.
-- `npm test`: 74 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 75.53% lines, 79.89% branches, and 79.04% functions.
-- `npm run package`: deterministically creates the 21-file, 88,867-byte
-  `release/neopian-assistant-7.10.0.zip` (SHA-256
-  `7222DB2BAF0509D1F8261534886D573CE1B8429FCBACF96F2DDA9F268119DB7E`).
+- `npm test`: 78 passed, 0 failed, 0 skipped.
+- `npm run test:coverage`: 67.64% lines, 76.60% branches, and 75.42% functions.
+- `npm run package`: deterministically creates the 21-file, 90,623-byte
+  `release/neopian-assistant-7.11.0.zip` (SHA-256
+  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B`).
 - Manifest validator confirmed 11 referenced files, generated icon dimensions/alpha, narrow
   permissions, CSP-safe HTML, no unsafe production API, consistent branding, and synchronized
   version.
@@ -269,6 +276,11 @@ Completed without mutation or sensitive capture:
 - Verified exactly one dashboard root after reload and daily navigation.
 - Marked and reset one manual daily locally, restored its original state, navigated to the intended
   daily page, and confirmed navigation did not falsely complete the task.
+- Invoked one no-spend Anchor Management daily action after validating the exact page-owned control.
+  The site removed the action and displayed its own daily-limit/cooldown state without a CAPTCHA or
+  error. The dashboard then recorded the verified claim, disabled its tracking control, displayed
+  **Claimed · available in 10h 24m**, and preserved the claim after reload while advancing the live
+  countdown to **10h 23m**.
 - Verified the repaired dashboard settings route opened exactly one options page. A dashboard
   preference persisted across reload and was restored.
 - Reloaded the current 7.10.0 SW Autobuy build and verified its exact renamed tab, disabled/dry-run
@@ -280,7 +292,7 @@ Completed without mutation or sensitive capture:
   still described the monitor as active while the dialog was open. The repaired transition now
   announces the stop before review. The final review also locked dismissal during in-flight pricing
   and purchase requests and made Auto Pricing own/clean up its dialog. These lifecycle repairs have
-  regression coverage; their installed check needs one final manual extension reload.
+  regression coverage and their installed check passed after reload.
 - Ran one-, three-, five-, and full eight-row Auto Pricing scans. All service-worker lookups failed
   closed with explicit error rows, no review, and no mutation; this isolated the authenticated
   request-context defect. After moving only the read-only fetch to the same-origin content context,
@@ -307,8 +319,9 @@ Completed without mutation or sensitive capture:
 - A read-only network/DOM comparison then proved that authenticated programmatic stock GETs return
   only a page shell: HTTP 200, account and form chrome, but zero paired rows. A normal hidden
   same-origin frame running Neopets' page scripts hydrated all eight stock rows. The repaired frame
-  loader and cleanup/size regressions are in the 74-test build. Its installed eight-row scan
-  completed with eight validated suggestions; excluding seven produced the exact one-row review.
+  loader and cleanup/size regressions entered the earlier 74-test build. Its installed eight-row
+  scan completed with eight validated suggestions; excluding seven produced the exact one-row
+  review.
 - The user authorized a reversible low-value 490 NP → 1 NP → 490 NP validation. The initial
   selected-only POST returned without the extension's success marker, so the exact row was reloaded
   before any retry and remained 490 NP. Live form tracing isolated the missing `lim` and `oldcost_N`
@@ -324,11 +337,13 @@ header, browser profile, or account screenshot was saved or committed. Only the 
 shop price update and its restoration were submitted; no purchase URL was followed.
 
 Early `dist/` builds were manually reloaded because Chrome browser automation correctly rejects
-`chrome://extensions/`. Computer Use later invoked the visible extension reload control at the
-user's explicit request; the newly repaired monitor behavior proved that build active. The latest
-content-only bundle loaded on an exact stock-page navigation and completed the eight-row scan above.
-A later Computer Use attempt was stopped by the user's physical Escape key, after which no further
-Windows input was issued. No privileged-URL bypass or profile manipulation was used.
+direct DOM access to `chrome://extensions/`. Computer Use later invoked the visible extension reload
+control at the user's explicit request; the newly repaired monitor behavior proved that build
+active. For 7.11.0, an ignored local PowerShell helper used bounded Windows UI Automation and
+required exactly one Chrome window, one Extensions tab, and one exact **Neopian Assistant** card
+before invoking its reload control and verifying version 7.11.0. It did not inspect Chrome profile
+data, storage, cookies, or authentication material. No privileged-URL bypass or profile manipulation
+was used.
 
 ## Remaining limitations and required follow-up
 

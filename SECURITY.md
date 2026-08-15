@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest version on the `main` branch. The currently supported
-extension release is 7.10.x.
+extension release is 7.11.x.
 
 ## Reporting a vulnerability
 
@@ -34,8 +34,8 @@ In scope:
 - Manifest permissions and content-script isolation.
 - Service-worker authorization/message validation and fixed same-origin network destinations.
 - Auto Pricing validation, confirmation, locking, idempotency, and verification.
-- SW Autobuy watchlist authorization, item/price/URL validation, fresh-listing binding, duplicate
-  prevention, locking, and response verification.
+- SW Autobuy watchlist authorization, item/price/URL validation, bounded rate-authorized
+  fresh-listing section checks, duplicate prevention, locking, and response verification.
 - Storage validation and migration.
 - Import/export behavior and unsafe DOM rendering.
 - Build, packaging, dependency, and secret-exposure risks.

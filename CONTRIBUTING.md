@@ -26,7 +26,7 @@ npm ci
 npm run verify
 ```
 
-Use Node.js 20 or later. The project uses vanilla JavaScript, HTML, and CSS, an npm lockfile,
+Use Node.js 20.9 or later. The project uses vanilla JavaScript, HTML, and CSS, an npm lockfile,
 esbuild, Biome, Prettier, and Node's built-in test runner.
 
 ## Development workflow

@@ -12,7 +12,7 @@ workflow. The dashboard is built with vanilla JavaScript, HTML, and CSS and runs
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
 
-Current extension version: **7.10.0**
+Current extension version: **7.11.0**
 
 Manifest version: **3**
 
@@ -23,14 +23,14 @@ Minimum Chrome version: **114**
 | Mode       | Feature                      | What happens                                                                                   | Can change account state?              |
 | ---------- | ---------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------- |
 | Navigation | Dailies **Go** links         | Opens the selected official Neopets page.                                                      | No                                     |
-| Tracking   | Manual completion            | Stores a local completion mark only after the user presses the separate completion control.    | Extension data only                    |
+| Tracking   | Manual claim cooldown        | Stores a local claim time only after the user presses the separate check control.              | Extension data only                    |
 | Assistance | Shop Wizard price scan       | Reads validated prices at a conservative interval and prepares suggestions.                    | No                                     |
 | Automation | Reviewed Auto Pricing update | Sends one exact shop-price form after fresh-state validation and explicit confirmation.        | Yes—changes shop prices                |
 | Assistance | SW Autobuy live watchlist    | Sequentially monitors up to 10 exact Shop Wizard names while its dashboard tab is open.        | No                                     |
 | Assistance | SW Autobuy dry run           | Validates and reviews one Shop Wizard listing without following the purchase URL.              | No                                     |
 | Automation | Reviewed one-item SW Autobuy | Rechecks and follows one exact listing URL once, below a configured maximum, then verifies it. | Yes—spends Neopoints and adds one item |
 
-No daily is automatically marked complete. There is no bidding, offering, trading, donating,
+No daily is automatically marked claimed. There is no bidding, offering, trading, donating,
 discarding, inventory transfer, CAPTCHA handling, stealth behavior, proxy rotation, credential
 access, telemetry, or developer-operated backend.
 
@@ -64,10 +64,15 @@ data.
 ### Dailies
 
 - Official daily pages are opened only when the user selects **Go**.
-- Completion is a separate manual action; navigation never implies success.
-- Daily and manual-tracking marks reset on the Neopian day boundary using `America/Los_Angeles`
-  time.
-- Count-based, monthly, and elapsed-time cooldowns are handled independently.
+- Claim tracking is a separate check action after the destination reports success; navigation never
+  implies a claim.
+- Claimed routines show a dynamic next-available countdown. Daily and manual/anytime claims use the
+  next Neopian `America/Los_Angeles` day boundary, monthly claims use the next Neopian month, and
+  elapsed timers use the exact claim timestamp.
+- Count-based routines remain ready until their daily limit is reached, then count down to the next
+  Neopian reset.
+- A claimed routine cannot be clicked again to erase its cooldown. The control becomes available
+  naturally when its validated time or reset boundary expires.
 - Groups, routines, notes, cooldowns, and approved `www.neopets.com` URLs can be edited locally.
 - Official item images from `images.neopets.com` are used under the repository owner's stated
   project-specific approval. The extension logo is original artwork.
@@ -170,7 +175,7 @@ or session data.
 
 ## Install from a release package
 
-1. Obtain `neopian-assistant-7.10.0.zip` from the release artifacts.
+1. Obtain `neopian-assistant-7.11.0.zip` from the release artifacts.
 2. Extract the archive to a permanent local folder.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable **Developer mode**.
@@ -180,7 +185,7 @@ The ZIP is an unpacked-extension package, not a signed Chrome Web Store `.crx`.
 
 ## Load the development build
 
-1. Install Node.js 20 or later and npm.
+1. Install Node.js 20.9 or later and npm.
 2. Clone the repository and install the exact lockfile dependencies:
 
    ```powershell
@@ -334,7 +339,7 @@ values sanitize to safe defaults, and versioned migrations are idempotent.
 
 ### Build or package validation fails
 
-Use Node 20+, run `npm ci`, then `npm run verify`. Resolve the first reported formatting, lint,
+Use Node 20.9+, run `npm ci`, then `npm run verify`. Resolve the first reported formatting, lint,
 test, Manifest, icon, CSP, unsafe-API, or secret-scan error before packaging.
 
 ## Branches, contributions, and pull requests

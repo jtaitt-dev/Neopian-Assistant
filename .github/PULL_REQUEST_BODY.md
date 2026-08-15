@@ -2,7 +2,7 @@
 
 This PR completes the production audit, repair, Manifest V3 hardening, Neopian Assistant rebrand,
 guarded shop workflows, test foundation, documentation, and release pipeline through extension
-version 7.10.0.
+version 7.11.0.
 
 > Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or
 > sponsored by Neopets.
@@ -11,20 +11,23 @@ The existing approved Auto Pricing feature remains available with its match/unde
 It now requires fresh authenticated shop state immediately before a one-shot update. The PR also
 adds a separate disabled-by-default, dry-run-by-default SW Autobuy workflow: a live watchlist of up
 to 10 exact Shop Wizard names plus one-item review with a hard maximum, quantity one, stale-listing
-checks, cross-tab locking, hashed duplicate prevention, no retry, and strict response verification.
+checks across at most eight rate-authorized market sections, cross-tab locking, hashed duplicate
+prevention, no retry, and strict response verification.
 
 ## User-visible changes
 
 - Four dashboard sections: Dailies, Progress, Auto Pricing, and SW Autobuy.
+- Dynamic daily claim countdowns cover Neopian daily/monthly resets, per-day caps, and elapsed
+  cooldowns; claimed routines cannot be accidentally reset by a second click.
 - Auto Pricing selected-price minimum of 1 NP and strict thousands-separator parsing.
 - Fresh stock comparison before price submission and `uncertain` status for ambiguous submitted
   outcomes.
 - SW Autobuy 10-item watchlist, 6–60 second sequential monitoring, dynamic validated results,
   explicit cancellation, review dialog, dry run, maximum-price control, redacted history, and clear
   failure guidance.
-- Manual/anytime completion marks reset at the Neopian day boundary.
+- Manual/anytime claims reset at the Neopian day boundary and show their exact remaining wait.
 - Enabling the extension after disabled startup mounts it without a page reload.
-- Synchronized 7.10.0 version, schema 4 migration, rebuilt release package, and complete current
+- Synchronized 7.11.0 version, schema 4 migration, rebuilt release package, and complete current
   documentation.
 
 ## Consequential-action protections
@@ -73,23 +76,24 @@ checks, cross-tab locking, hashed duplicate prevention, no retry, and strict res
 - All source JavaScript `node --check` — passed.
 - `npm run format:check` — passed.
 - `npm run lint` — passed.
-- `npm test` — passed; 74 passed, 0 failed, 0 skipped.
-- `npm run test:coverage` — passed; 75.53% lines, 79.89% branches, 79.04% functions.
+- `npm test` — passed; 78 passed, 0 failed, 0 skipped.
+- `npm run test:coverage` — passed; 67.64% lines, 76.60% branches, 75.42% functions.
 - `npm run build` — passed; production output in `dist/`.
 - `npm run validate` — passed; Manifest V3, 11 references, icons/alpha, CSP-safe HTML, branding,
   synchronized version, and production API constraints.
 - `npm run secret-scan` — passed; no credential-shaped values, sensitive filenames, or private local
   paths.
-- `npm run package` — passed twice deterministically; 21-file, 88,867-byte
-  `release/neopian-assistant-7.10.0.zip`, SHA-256
-  `7222DB2BAF0509D1F8261534886D573CE1B8429FCBACF96F2DDA9F268119DB7E`.
+- `npm run package` — passed twice deterministically; 21-file, 90,623-byte
+  `release/neopian-assistant-7.11.0.zip`, SHA-256
+  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B`.
 - `npm run validate:branch -- feature/neopian-assistant-audit-rebrand` — passed.
 
 Added coverage for strict price parsing, zero protection, fresh shop state, partial-result status,
 purchase limits/item/URL/visible-price validation, duplicate history, locks, strict response
 verification, SW Autobuy watchlist bounds/authorization/mismatch shutdown/dynamic parser/review-stop
-status, dry-run non-mutation, sender/page binding, disabled-startup reactivation, daily timezone
-reset, schema write-back, and live-results heading fallback.
+status, bounded eight-section fresh listing checks, dry-run non-mutation, sender/page binding,
+disabled-startup reactivation, Neopian daily/monthly and daylight-saving reset boundaries,
+idempotent daily claim caps, schema write-back, and live-results heading fallback.
 
 ## Browser and live-account validation
 
@@ -168,9 +172,17 @@ the exact 490 NP → 1 NP update, independently read 1 NP after reload, verified
 floor-1/10-item/8-second settings were restored and persisted. No unrelated row changed and no
 account-private evidence was saved.
 
-The final manual unpacked-extension reload also exposed Chrome's stale-content
+The prior manual unpacked-extension reload also exposed Chrome's stale-content
 `Extension context invalidated` rejection. The repaired save boundary now removes that disconnected
 dashboard without an unhandled promise while preserving ordinary storage failures for diagnosis.
+
+For 7.11.0, an ignored local PowerShell helper used bounded Windows UI Automation to invoke the
+exact **Neopian Assistant** reload control and verify version 7.11.0 without inspecting Chrome
+profile data or extension storage. An authenticated no-spend Anchor Management claim then produced
+the site's own daily-limit/cooldown state. Only after that verification, the extension recorded the
+claim and displayed a disabled **Claimed · available in 10h 24m** row; a full page reload preserved
+the claim and advanced the countdown to **10h 23m**. No account identity, balance, reward details,
+authentication material, raw HTML, or screenshot was saved.
 
 ## Documentation and policy
 

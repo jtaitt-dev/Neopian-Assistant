@@ -1,19 +1,19 @@
 # Validation and Browser Evidence
 
-Evidence date: 2026-07-19
+Evidence date: 2026-08-15
 
-Current production build: Neopian Assistant 7.10.0 (`dist/`)
+Current production build: Neopian Assistant 7.11.0 (`dist/`)
 
-Current release package: `release/neopian-assistant-7.10.0.zip`
+Current release package: `release/neopian-assistant-7.11.0.zip`
 
 ## Automated validation
 
-The current 7.10.0 build passed:
+The current 7.11.0 build passed:
 
 - Prettier formatting verification.
 - Biome lint with no warnings.
-- 74 Node behavioral tests, 74 passed, 0 failed, 0 skipped.
-- `npm run test:coverage`: 75.70% aggregate line coverage, 79.93% branch coverage, and 78.95%
+- 78 Node behavioral tests, 78 passed, 0 failed, 0 skipped.
+- `npm run test:coverage`: 67.64% aggregate line coverage, 76.60% branch coverage, and 75.42%
   function coverage; UI surfaces also require installed-browser validation.
 - Syntax checking of every source JavaScript file.
 - esbuild production build.
@@ -22,8 +22,8 @@ The current 7.10.0 build passed:
 - Repository secret scan with no credential-shaped values, sensitive filenames, or private local
   paths.
 - `npm audit --audit-level=high` with 0 vulnerabilities.
-- Deterministic 21-file release packaging: 89,133 bytes, SHA-256
-  `DD14B1937A7BCCC7D1B8EBB549EFBC932CCF662620CB59B6E33EC22F2DA89BCF` on two consecutive runs.
+- Deterministic 21-file release packaging: 90,623 bytes, SHA-256
+  `C9D0989A54A457EA85C30A11E871B0878FB23B3C59069C26027F7450E773702B` on two consecutive runs.
 
 The expanded suite covers price parsing/limits/verification, fresh shop state, partial-result
 classification, purchase maximums/item/URL identity/visible price/fingerprint/duplicate window/
@@ -149,7 +149,7 @@ normal hidden same-origin frame running Neopets' own page scripts hydrated eight
 selected item. The repaired client therefore loads only the exact own-stock URL in a hidden frame,
 polls for a complete paired-field form within a fixed deadline, caps the serialized result at 2 MB,
 and removes the frame on every exit path. Three new client regressions prove hydrated success,
-timeout cleanup, and oversized-page rejection; the full suite is now 74 tests. A fresh installed
+timeout cleanup, and oversized-page rejection; that suite reached 74 tests. A fresh installed
 eight-row scan completed with eight validated suggestions, and deselecting seven left the exact
 one-row review.
 
@@ -212,12 +212,28 @@ returning to SW Autobuy showed a non-running queued state. Disabled, dry run, th
 the 8-second interval, and an empty watchlist were then restored and verified after a page reload.
 The dashboard still mounted exactly once and no Neopian Assistant console error or warning occurred.
 
+## Current 7.11.0 daily-cooldown installed-build evidence
+
+An ignored local PowerShell helper used Windows UI Automation to invoke the exact visible reload
+control for the single **Neopian Assistant** card on Chrome's existing Extensions tab. It required
+exactly one Chrome window, one Extensions tab, and one matching extension card, and verified the
+loaded version as 7.11.0. It did not inspect Chrome profile data, extension storage, cookies, or
+authentication material.
+
+On the authenticated Anchor Management page, the no-spend site action was invoked once. The site
+removed its claim control and displayed its own daily-limit/cooldown state without a CAPTCHA or
+error. Only after that site-side verification, the dashboard's separate tracking control was clicked
+once. The row changed to a disabled **Claimed · available in 10h 24m** state. A full page reload
+preserved the claim and displayed **Claimed · available in 10h 23m**, demonstrating both storage
+persistence and a live countdown to the next Neopian daily boundary. No account identity, balance,
+reward details, token, raw page HTML, or screenshot was saved.
+
 ## Remaining installed-build gate
 
-Chrome automation rejects access to `chrome://extensions/` under its privileged-URL security policy.
-No workaround, CDP bypass, profile manipulation, or alternate privileged surface was used. The user
-manually reloaded the authenticated transport and SW Autobuy build, and the checks above passed. The
-remaining installed-build gates are:
+Chrome browser automation rejects direct DOM access to `chrome://extensions/` under its
+privileged-URL security policy. The exact visible reload control was invoked through bounded Windows
+UI Automation as described above; no CDP bypass or profile manipulation was used. The remaining
+installed-build gates are:
 
 - One low-value purchase with strict response verification plus duplicate/multi-tab behavior, only
   after action-time user confirmation.

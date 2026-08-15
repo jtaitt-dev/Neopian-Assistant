@@ -63,7 +63,8 @@ Data leaves the browser only when the user explicitly starts Auto Pricing or SW 
 
 - After the user starts monitoring, saved exact item names are sent sequentially to the same fixed
   Shop Wizard endpoint at a configured 6–60 second interval while the dashboard tab stays open.
-- Selecting a match sends its exact item name to the same endpoint again to recheck the listing.
+- Selecting a match sends its exact item name to the same endpoint in at most eight sequential,
+  rate-authorized read-only requests to cover Shop Wizard's rotating market sections.
 - After opt-in, disabling dry run, price-ceiling validation, fresh-listing comparison, and explicit
   one-item confirmation, the exact validated `https://www.neopets.com/browseshop.phtml` purchase URL
   is requested once.

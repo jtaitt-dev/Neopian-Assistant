@@ -2,6 +2,43 @@
 
 All notable project changes are documented here.
 
+## 7.11.0 — 2026-08-15
+
+Version 7.10.0 was increased to 7.11.0 because this release adds backward-compatible dynamic daily
+claim tracking and extends the guarded SW Autobuy fresh-listing workflow across Shop Wizard's
+rotating market sections.
+
+### Added
+
+- Exact next-available countdowns for daily, monthly, manual/anytime, elapsed-time, and exhausted
+  per-day claim limits using the Neopian `America/Los_Angeles` reset boundary, including daylight
+  saving transitions.
+- Claim-focused dailies guidance and regression coverage for daily claim persistence, idempotent
+  clicks, per-day limits, daily/monthly resets, and spring/fall time changes.
+- Bounded SW Autobuy fresh-listing discovery across at most eight independently rate-authorized Shop
+  Wizard sections before a confirmed purchase can proceed.
+
+### Changed
+
+- The daily check now records a successful claim and remains disabled until the routine is actually
+  available again. A second click can no longer silently erase cooldown tracking.
+- Daily rows show `Claimed · available in …`; count-based routines remain ready until their daily
+  cap and then count down to the next Neopian reset.
+- Synchronized the extension, package, build, documentation, CI artifact, and release archive at
+  version 7.11.0. Storage schema 4 remains compatible and unchanged.
+
+### Fixed
+
+- Updated the development-only `sharp` image dependency to 0.35.3 after the upstream libvips
+  advisory affected earlier releases; dependency audit now reports zero vulnerabilities. The
+  documented Node.js minimum is 20.9 to match the patched package's engine requirement.
+- A valid SW Autobuy listing no longer fails merely because a single fresh Shop Wizard response
+  rotated to a different market section. Every additional read is worker-authorized and paced; an
+  identity or price change aborts immediately, all-eight-section misses fail closed, and the exact
+  purchase URL is still followed at most once with no purchase retry.
+
+Auto Pricing rules and pricing behavior are unchanged in 7.11.0.
+
 ## 7.10.0 — 2026-07-18
 
 Version 7.9.0 was increased to 7.10.0 because this release adds a backward-compatible live Shop
