@@ -1,4 +1,10 @@
 import { MAIN_SHOP_LIMITS, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constants.js";
+import {
+  configureTool,
+  enhanceReviewDialog,
+  moveToolNotes,
+  showThemedDialog,
+} from "../shared/appearance.js";
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { createTextFingerprint } from "../shared/pricing-operations.js";
 import { isKauvaraMagicShopUrl, sanitizeMainShopWatchlist } from "../shared/validation.js";
@@ -33,6 +39,7 @@ export class MainShopAutoBuyController {
     this.purchaseLauncher = purchaseLauncher;
     this.status = null;
     this.dialog = null;
+    this.configOpen = undefined;
     this.monitoring = false;
     this.monitorRunId = null;
     this.monitorController = null;
@@ -221,6 +228,13 @@ export class MainShopAutoBuyController {
     this.monitorResultsRoot = element("div", { className: "na-watchlist-results" });
     this.applyCandidates(onMagicShopPage ? extractMainShopCandidates(document) : []);
 
+    const configuration = configureTool(settingsPanel, {
+      summary: `${this.settings.watchlist.length}/100 names · ${this.settings.requestIntervalMs / 1000}s stock checks`,
+      open: this.configOpen ?? this.settings.watchlist.length === 0,
+      onToggle: (open) => {
+        this.configOpen = open;
+      },
+    });
     container.append(
       element("div", { className: "na-section-heading" }, [
         element("div", {}, [
@@ -230,7 +244,7 @@ export class MainShopAutoBuyController {
           }),
         ]),
       ]),
-      settingsPanel,
+      configuration,
       element("div", { className: "na-notice na-notice--warning" }, [
         icon("info"),
         element("p", {
@@ -249,7 +263,14 @@ export class MainShopAutoBuyController {
               ),
             ]),
           ]
-        : []),
+        : [
+            element("div", { className: "na-notice" }, [
+              icon("shield"),
+              element("p", {
+                text: "Kauvara’s Magic Shop detected. Ready to check its live stock.",
+              }),
+            ]),
+          ]),
       element("div", { className: "na-action-row" }, [
         this.monitorStartButton,
         this.monitorStopButton,
@@ -263,6 +284,7 @@ export class MainShopAutoBuyController {
       this.monitorResultsRoot,
       this.status,
     );
+    moveToolNotes(container, configuration);
   }
 
   applyCandidates(candidates) {
@@ -321,7 +343,10 @@ export class MainShopAutoBuyController {
             {
               className: "na-button na-button--secondary na-button--small",
               type: "button",
-              disabled: result.state !== "ready",
+              disabled:
+                result.state !== "ready" ||
+                !this.settings.enabled ||
+                !isKauvaraMagicShopUrl(window.location.href),
               onClick: () => this.beginCandidate(result.candidate),
             },
             this.settings.dryRun ? "Review" : "Buy one",
@@ -336,7 +361,12 @@ export class MainShopAutoBuyController {
   }
 
   syncMonitorControls() {
-    if (this.monitorStartButton) this.monitorStartButton.disabled = this.monitoring;
+    if (this.monitorStartButton)
+      this.monitorStartButton.disabled =
+        this.monitoring ||
+        !this.settings.enabled ||
+        this.settings.watchlist.length === 0 ||
+        !isKauvaraMagicShopUrl(window.location.href);
     if (this.monitorStopButton) this.monitorStopButton.disabled = !this.monitoring;
   }
 
@@ -581,7 +611,8 @@ export class MainShopAutoBuyController {
       },
       { once: true },
     );
-    dialog.showModal();
+    enhanceReviewDialog(dialog);
+    showThemedDialog(dialog, this.data.settings);
     confirmation.focus();
   }
 

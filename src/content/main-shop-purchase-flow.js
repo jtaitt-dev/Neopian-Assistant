@@ -1,3 +1,4 @@
+import { applyAppearance } from "../shared/appearance.js";
 import { MAIN_SHOP_LIMITS, MESSAGE_TYPES } from "../shared/constants.js";
 import {
   isKauvaraHaggleUrl,
@@ -40,6 +41,11 @@ function createFlowBanner(documentObject) {
   root.setAttribute("role", "status");
   root.setAttribute("aria-live", "polite");
   root.dataset.tone = "running";
+  const shell = documentObject.getElementById("neopian-assistant-root");
+  applyAppearance(root, {
+    theme: shell?.dataset.theme ?? "system",
+    density: shell?.dataset.density ?? "comfortable",
+  });
   const heading = documentObject.createElement("strong");
   heading.textContent = "MS Autobuy";
   const status = documentObject.createElement("span");

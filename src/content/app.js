@@ -1,5 +1,6 @@
 import { BRAND, MESSAGE_TYPES } from "../shared/constants.js";
-import { element, icon, setStatus } from "../shared/dom.js";
+import { compassMark, element, icon, setStatus } from "../shared/dom.js";
+import { applyAppearance, showThemedDialog } from "../shared/appearance.js";
 import { saveAppData } from "../shared/storage.js";
 import {
   cloneValue,
@@ -52,6 +53,8 @@ export class NeopianAssistantApp {
     this.status = null;
     this.activeTab = "dailies";
     this.search = "";
+    this.availabilityFilter = "all";
+    this.viewportHandler = null;
     this.editing = false;
     this.timer = null;
     this.resizeObserver = null;
@@ -92,7 +95,7 @@ export class NeopianAssistantApp {
       },
       { once: true },
     );
-    dialog.showModal();
+    showThemedDialog(dialog, this.data.settings);
   }
 
   announce(message, tone = "neutral") {
@@ -118,13 +121,12 @@ export class NeopianAssistantApp {
     root.style.top = `${this.data.settings.panel.top}px`;
     root.style.right = `${this.data.settings.panel.right}px`;
     root.style.width = `${this.data.settings.panel.width}px`;
-    root.dataset.theme = this.data.settings.theme;
-    root.dataset.density = this.data.settings.density;
+    applyAppearance(root, this.data.settings);
 
     const brandMark = element(
       "span",
       { className: "na-brand-mark", ariaHidden: "true" },
-      icon("spark"),
+      compassMark(),
     );
     const header = element("header", { className: "na-header" }, [
       element("div", { className: "na-brand" }, [
@@ -191,6 +193,9 @@ export class NeopianAssistantApp {
         type: "button",
         className: "na-tab",
         role: "tab",
+        id: `na-tab-${id}`,
+        ariaControls: "na-dashboard-panel",
+        tabIndex: id === this.activeTab ? 0 : -1,
         ariaSelected: id === this.activeTab,
         dataset: { tab: id },
         text: label,
@@ -202,6 +207,8 @@ export class NeopianAssistantApp {
     this.content = element("div", {
       className: "na-content",
       role: "tabpanel",
+      id: "na-dashboard-panel",
+      ariaLabelledby: `na-tab-${this.activeTab}`,
       tabIndex: 0,
     });
     this.status = element("div", {
@@ -218,6 +225,10 @@ export class NeopianAssistantApp {
     document.body.append(root);
     this.root = root;
     this.root.classList.toggle("na-shell--minimized", this.data.settings.panel.minimized);
+    this.clampToViewport();
+    this.viewportHandler = () => this.clampToViewport();
+    window.addEventListener("resize", this.viewportHandler);
+    this.attachTabKeyboard(tabs);
     this.attachDragBehavior(header);
     this.attachResizeBehavior();
     this.renderActiveTab();
@@ -227,6 +238,7 @@ export class NeopianAssistantApp {
   async toggleMinimized() {
     this.data.settings.panel.minimized = !this.data.settings.panel.minimized;
     this.root.classList.toggle("na-shell--minimized", this.data.settings.panel.minimized);
+    this.clampToViewport();
     const button = this.root.querySelector("button[title='Minimize'], button[title='Expand']");
     if (button) {
       button.title = this.data.settings.panel.minimized ? "Expand" : "Minimize";
@@ -246,9 +258,12 @@ export class NeopianAssistantApp {
 
   switchTab(tabId) {
     if (!["dailies", "mainShop", "pricing", "buying"].includes(tabId)) return;
+    if (this.activeTab === tabId) return;
     this.activeTab = tabId;
+    this.content.setAttribute("aria-labelledby", `na-tab-${tabId}`);
     for (const tab of this.root.querySelectorAll(".na-tab")) {
       tab.setAttribute("aria-selected", String(tab.dataset.tab === tabId));
+      tab.tabIndex = tab.dataset.tab === tabId ? 0 : -1;
     }
     this.renderActiveTab();
   }
@@ -313,9 +328,8 @@ export class NeopianAssistantApp {
       ariaLabel: "Search dailies",
     });
     search.addEventListener("input", () => {
-      this.search = search.value.toLowerCase().trim();
-      this.rerenderDailies();
-      this.content.querySelector("input[type='search']")?.focus();
+      this.search = search.value;
+      this.refreshVisibleStatus();
     });
     toolbar.append(
       element("div", { className: "na-search" }, [icon("search"), search]),
@@ -327,11 +341,42 @@ export class NeopianAssistantApp {
         },
       }),
     );
-    this.content.append(toolbar);
+    this.content.append(
+      element("div", { className: "na-dailies-heading" }, [
+        element("h2", { text: "Dailies" }),
+        toolbar,
+      ]),
+      this.createProgressSummary(),
+    );
+    const filters = element("div", {
+      className: "na-filters",
+      role: "group",
+      ariaLabel: "Daily availability",
+    });
+    for (const [value, label] of [
+      ["all", "All"],
+      ["ready", "Ready"],
+      ["cooldown", "On cooldown"],
+    ]) {
+      filters.append(
+        element("button", {
+          type: "button",
+          className: "na-filter",
+          ariaPressed: value === this.availabilityFilter,
+          dataset: { filter: value },
+          text: label,
+          onClick: () => {
+            this.availabilityFilter = value;
+            this.refreshVisibleStatus();
+          },
+        }),
+      );
+    }
+    this.content.append(filters);
     this.content.append(
       element("p", {
         className: "na-daily-help",
-        text: "Open a daily with Go, then press the check after the claim succeeds. Neopian Assistant will track when it becomes available again.",
+        text: "Open with Go. Mark claimed after you finish on Neopets.",
       }),
     );
 
@@ -350,17 +395,20 @@ export class NeopianAssistantApp {
     }
 
     const groupsContainer = element("div", { className: "na-groups" });
-    const query = this.search;
+    const query = this.search.toLowerCase().trim();
     for (const group of this.data.groups) {
       const visibleItems = group.items.filter((item) => item.name.toLowerCase().includes(query));
       if (query && visibleItems.length === 0) continue;
-      const groupSection = element("section", { className: "na-group" });
+      const groupSection = element("section", {
+        className: "na-group",
+        dataset: { groupIndex: this.data.groups.indexOf(group) },
+      });
       const toggle = element(
         "button",
         {
           type: "button",
           className: "na-group__toggle",
-          ariaExpanded: !group.collapsed,
+          ariaExpanded: !group.collapsed || Boolean(query) || this.availabilityFilter !== "all",
           onClick: async () => {
             group.collapsed = !group.collapsed;
             await this.save();
@@ -370,7 +418,7 @@ export class NeopianAssistantApp {
         element("span", { className: "na-group__title" }, [
           icon("chevron"),
           element("strong", { text: group.name }),
-          element("span", { text: String(visibleItems.length) }),
+          element("span", { className: "na-group__count", text: String(visibleItems.length) }),
         ]),
       );
       const groupHeader = element("div", { className: "na-group__header" }, toggle);
@@ -407,7 +455,7 @@ export class NeopianAssistantApp {
         );
       }
       groupSection.append(groupHeader);
-      if (!group.collapsed || query) {
+      {
         const list = element("div", { className: "na-daily-list" });
         visibleItems.forEach((item, itemIndex) => {
           list.append(this.createDailyRow(group, item, itemIndex));
@@ -424,7 +472,14 @@ export class NeopianAssistantApp {
         ]),
       );
     }
-    this.content.append(groupsContainer, this.createProgressSummary());
+    this.content.append(
+      groupsContainer,
+      element("div", { className: "na-empty-state na-filter-empty", hidden: true }, [
+        element("h3", { text: "No matching routines" }),
+        element("p", { text: "Try another search or availability filter." }),
+      ]),
+    );
+    this.refreshVisibleStatus();
   }
 
   createDailyRow(group, item, itemIndex) {
@@ -475,6 +530,7 @@ export class NeopianAssistantApp {
             text: statusText,
             dataset: { dailyStatus: item.id },
           }),
+          item.notes ? element("span", { className: "na-daily__notes", text: item.notes }) : null,
         ]),
         element(
           "a",
@@ -498,7 +554,7 @@ export class NeopianAssistantApp {
               className: "na-icon-button",
               ariaLabel: `Move ${item.name} up`,
               disabled: itemIndex === 0,
-              onClick: () => this.moveDaily(group, itemIndex, -1),
+              onClick: () => this.moveDaily(group, item.id, -1),
             },
             icon("chevron"),
           ),
@@ -509,7 +565,7 @@ export class NeopianAssistantApp {
               className: "na-icon-button na-icon-button--down",
               ariaLabel: `Move ${item.name} down`,
               disabled: itemIndex === group.items.length - 1,
-              onClick: () => this.moveDaily(group, itemIndex, 1),
+              onClick: () => this.moveDaily(group, item.id, 1),
             },
             icon("chevron"),
           ),
@@ -547,7 +603,7 @@ export class NeopianAssistantApp {
     const cooldown = parseCooldown(item.cooldown);
     if (cooldown.type === "count" && status.count > 0)
       return `${status.count} of ${status.limit} claimed · ready again`;
-    return item.notes || "Ready";
+    return "Ready";
   }
 
   async claimDaily(item) {
@@ -572,48 +628,142 @@ export class NeopianAssistantApp {
       this.data.history = this.data.history.slice(0, 100);
       await this.save();
       this.announce(`${item.name} claim tracked.`, "success");
-      this.renderActiveTab();
+      if (this.content) this.refreshVisibleStatus();
     } finally {
       this.pendingDailyClaims.delete(item.id);
+      if (this.content) this.refreshVisibleStatus();
     }
   }
 
   createProgressSummary() {
-    const items = this.data.groups.flatMap((group) => group.items);
-    const completed = items.filter(
-      (item) => getDailyStatus(item, this.data.state[item.id]).complete,
-    ).length;
-    const percent = items.length === 0 ? 0 : Math.round((completed / items.length) * 100);
-    return element("section", { className: "na-progress-summary", ariaLabel: "Today's progress" }, [
-      element(
-        "div",
-        { className: "na-progress-ring", style: `--na-progress:${percent * 3.6}deg` },
-        [element("strong", { text: `${completed}/${items.length}` })],
-      ),
-      element("div", {}, [
-        element("strong", { text: "Today's progress" }),
-        element("span", { text: `${percent}% currently on cooldown` }),
-        element("progress", { value: completed, max: Math.max(1, items.length) }),
+    return element("section", { className: "na-availability", ariaLabel: "Routine availability" }, [
+      element("div", { className: "na-availability__counts" }, [
+        element("strong", { dataset: { readyCount: "" } }),
+        element("span", { dataset: { cooldownCount: "" } }),
       ]),
+      element("progress", { value: 0, max: 1, ariaLabel: "Routines ready" }),
     ]);
   }
 
   rerenderDailies() {
     if (this.activeTab !== "dailies") return;
+    const scrollTop = this.content.scrollTop;
+    const focused = document.activeElement;
+    const label = focused?.getAttribute("aria-label");
     this.content.replaceChildren();
     this.renderDailies();
+    this.content.scrollTop = scrollTop;
+    if (label)
+      [...this.content.querySelectorAll("[aria-label]")]
+        .find((node) => node.getAttribute("aria-label") === label)
+        ?.focus({ preventScroll: true });
   }
 
   refreshVisibleStatus() {
-    this.rerenderDailies();
+    if (this.activeTab !== "dailies" || !this.content || !this.data.settings.dailiesEnabled) return;
+    const query = this.search.toLowerCase().trim();
+    let ready = 0;
+    let cooldown = 0;
+    let visibleTotal = 0;
+    for (const section of this.content.querySelectorAll(".na-group")) {
+      const group = this.data.groups[Number(section.dataset.groupIndex)];
+      let visible = 0;
+      for (const row of section.querySelectorAll(".na-daily")) {
+        const item = group.items.find((candidate) => candidate.id === row.dataset.dailyId);
+        const status = getDailyStatus(item, this.data.state[item.id]);
+        if (status.complete) cooldown += 1;
+        else ready += 1;
+        const text = this.getStatusText(item, status);
+        row.querySelector(".na-daily__status").textContent = text;
+        row.classList.toggle("na-daily--complete", status.complete);
+        const check = row.querySelector(".na-check-button");
+        check.disabled = status.complete || this.pendingDailyClaims.has(item.id);
+        check.classList.toggle("na-check-button--complete", status.complete);
+        check.setAttribute(
+          "aria-label",
+          status.complete
+            ? `${item.name} is tracked and currently unavailable`
+            : `Mark ${item.name} claimed`,
+        );
+        check.title = status.complete ? text : "Mark claimed";
+        row.hidden =
+          !item.name.toLowerCase().includes(query) ||
+          (this.availabilityFilter === "ready" && status.complete) ||
+          (this.availabilityFilter === "cooldown" && !status.complete);
+        if (!row.hidden) visible += 1;
+      }
+      visibleTotal += visible;
+      section.hidden = visible === 0 && !this.editing;
+      const expanded = !group.collapsed || Boolean(query) || this.availabilityFilter !== "all";
+      section.querySelector(".na-group__toggle").setAttribute("aria-expanded", String(expanded));
+      section.querySelector(".na-daily-list").hidden = !expanded;
+      section.querySelector(".na-group__count").textContent = String(visible);
+    }
+    const summary = this.content.querySelector(".na-availability");
+    if (summary) {
+      summary.querySelector("[data-ready-count]").textContent = `${ready} ready`;
+      summary.querySelector("[data-cooldown-count]").textContent = `${cooldown} on cooldown`;
+      summary.querySelector("progress").max = Math.max(1, ready + cooldown);
+      summary.querySelector("progress").value = ready;
+    }
+    for (const button of this.content.querySelectorAll("[data-filter]")) {
+      button.setAttribute(
+        "aria-pressed",
+        String(button.dataset.filter === this.availabilityFilter),
+      );
+    }
+    const empty = this.content.querySelector(".na-filter-empty");
+    if (empty) empty.hidden = visibleTotal > 0 || this.editing;
   }
 
-  async moveDaily(group, index, direction) {
+  async moveDaily(group, itemId, direction) {
+    const index = group.items.findIndex((item) => item.id === itemId);
     const target = index + direction;
-    if (target < 0 || target >= group.items.length) return;
+    if (index < 0 || target < 0 || target >= group.items.length) return;
     [group.items[index], group.items[target]] = [group.items[target], group.items[index]];
     await this.save();
     this.rerenderDailies();
+  }
+
+  attachTabKeyboard(tabs) {
+    tabs.addEventListener("keydown", (event) => {
+      const buttons = [...tabs.querySelectorAll('[role="tab"]')];
+      const index = buttons.indexOf(event.target);
+      if (index < 0) return;
+      let next;
+      if (event.key === "ArrowRight") next = (index + 1) % buttons.length;
+      if (event.key === "ArrowLeft") next = (index + buttons.length - 1) % buttons.length;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = buttons.length - 1;
+      if (next === undefined) return;
+      event.preventDefault();
+      for (const button of buttons) button.tabIndex = -1;
+      buttons[next].tabIndex = 0;
+      buttons[next].focus();
+      buttons[next].scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+
+  minimumVisibleHeight() {
+    return this.data.settings.panel.minimized
+      ? 96
+      : Math.min(420, Math.max(0, window.innerHeight - 16));
+  }
+
+  clampToViewport() {
+    if (!this.root) return;
+    const panel = this.data.settings.panel;
+    const width = Math.min(panel.width, Math.max(0, window.innerWidth - 16));
+    const right = Math.max(8, Math.min(panel.right, window.innerWidth - width - 8));
+    const top = Math.max(
+      8,
+      Math.min(panel.top, Math.max(8, window.innerHeight - this.minimumVisibleHeight() - 8)),
+    );
+    this.root.style.width = `${width}px`;
+    this.root.style.right = `${right}px`;
+    this.root.style.left = "auto";
+    this.root.style.top = `${top}px`;
+    this.root.style.maxHeight = `${Math.max(0, window.innerHeight - top - 8)}px`;
   }
 
   openGroupDialog(existing = null) {
@@ -804,10 +954,17 @@ export class NeopianAssistantApp {
         4,
         Math.min(window.innerWidth - this.root.offsetWidth - 4, event.clientX - drag.offsetX),
       );
-      const top = Math.max(4, Math.min(window.innerHeight - 56, event.clientY - drag.offsetY));
+      const top = Math.max(
+        4,
+        Math.min(
+          window.innerHeight - this.minimumVisibleHeight() - 8,
+          event.clientY - drag.offsetY,
+        ),
+      );
       this.root.style.left = `${left}px`;
       this.root.style.right = "auto";
       this.root.style.top = `${top}px`;
+      this.root.style.maxHeight = `${window.innerHeight - top - 8}px`;
     });
     handle.addEventListener("pointerup", async (event) => {
       if (!drag || drag.pointerId !== event.pointerId) return;
@@ -822,11 +979,18 @@ export class NeopianAssistantApp {
   }
 
   attachResizeBehavior() {
-    this.resizeObserver = new ResizeObserver((entries) => {
-      const width = Math.round(entries[0]?.contentRect.width ?? this.data.settings.panel.width);
+    this.resizeObserver = new ResizeObserver(() => {
+      const width = Math.round(this.root.getBoundingClientRect().width);
+      if (
+        width === this.data.settings.panel.width ||
+        width >= window.innerWidth - 17 ||
+        width < 340
+      )
+        return;
       window.clearTimeout(this.resizeTimer);
       this.resizeTimer = window.setTimeout(async () => {
         this.data.settings.panel.width = Math.min(640, Math.max(340, width));
+        this.clampToViewport();
         await this.save();
       }, 300);
     });
@@ -834,6 +998,7 @@ export class NeopianAssistantApp {
   }
 
   cleanup() {
+    if (this.viewportHandler) window.removeEventListener("resize", this.viewportHandler);
     if (this.timer) window.clearInterval(this.timer);
     if (this.resizeTimer) window.clearTimeout(this.resizeTimer);
     this.resizeObserver?.disconnect();

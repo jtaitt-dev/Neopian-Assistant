@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-na-ui data-theme="system">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Neopian Assistant Settings</title>
+    <link rel="stylesheet" href="../ui/theme.css" />
     <link rel="stylesheet" href="../ui/common.css" />
     <link rel="stylesheet" href="options.css" />
   </head>
@@ -13,11 +14,13 @@
         <img src="../icons/icon64.png" width="52" height="52" alt="" />
         <div>
           <h1>Neopian Assistant</h1>
-          <p>Your all-in-one companion for smarter Neopets routines.</p>
+          <p>Smarter routines, one visit at a time.</p>
         </div>
       </div>
       <div class="options-header__save">
-        <button id="save" class="ui-button ui-button--primary" type="button">Save changes</button>
+        <button id="save" disabled class="ui-button ui-button--primary" type="button">
+          Save changes
+        </button>
         <div id="status" class="ui-status" role="status" aria-live="polite"></div>
       </div>
     </header>
@@ -28,11 +31,13 @@
         <a href="#dailies">Dailies</a>
         <a href="#auto-pricing">Auto Pricing</a>
         <a href="#auto-buy">SW Autobuy</a>
+        <a href="#main-shop">MS Autobuy</a>
         <a href="#privacy">Privacy &amp; Data</a>
         <a href="#about">About</a>
       </nav>
 
       <main id="settings" aria-busy="true">
+        <h2 class="settings-page-title">Settings</h2>
         <section id="general" class="options-section" aria-labelledby="general-title">
           <div class="options-section__heading">
             <h2 id="general-title">General</h2>
@@ -41,7 +46,7 @@
           <div class="settings-list">
             <div class="setting-row">
               <div>
-                <label for="enabled">Global enabled</label>
+                <label for="enabled">Assistant enabled</label>
                 <p>Turn Neopian Assistant on or off on all supported Neopets pages.</p>
               </div>
               <label class="ui-switch" aria-label="Enable Neopian Assistant">
@@ -52,7 +57,7 @@
             <div class="setting-row">
               <div>
                 <label for="theme">Theme</label>
-                <p>Choose a light, dark, or system-matched dashboard.</p>
+                <p>Applies to the dashboard, popup, settings, and dialogs.</p>
               </div>
               <select id="theme">
                 <option value="system">Use system setting</option>
@@ -236,6 +241,61 @@
           </div>
         </section>
 
+        <section id="main-shop" class="options-section" aria-labelledby="main-shop-title">
+          <div class="options-section__heading">
+            <h2 id="main-shop-title">MS Autobuy</h2>
+            <p>Monitor up to 100 exact names in Kauvara's Magic Shop.</p>
+          </div>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <label for="main-shop-enabled">Enable MS Autobuy</label>
+                <p>Arm one exact listed-price purchase after a fresh stock check.</p>
+              </div>
+              <label class="ui-switch" aria-label="Enable MS Autobuy"
+                ><input id="main-shop-enabled" type="checkbox" /><span
+                  class="ui-switch__track"
+                ></span
+              ></label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <label for="main-shop-dry-run">Dry run</label>
+                <p>Review a match without opening the official purchase flow.</p>
+              </div>
+              <label class="ui-switch" aria-label="Use MS Autobuy dry-run mode"
+                ><input id="main-shop-dry-run" type="checkbox" /><span
+                  class="ui-switch__track"
+                ></span
+              ></label>
+            </div>
+            <div class="setting-fields">
+              <label
+                >Seconds between stock checks<input
+                  id="main-shop-interval"
+                  type="number"
+                  min="8"
+                  max="60"
+                  step="1"
+              /></label>
+              <label class="setting-field--wide"
+                >Kauvara watchlist (one exact name per line; maximum 100)<textarea
+                  id="main-shop-watchlist"
+                  rows="7"
+                  maxlength="10100"
+                ></textarea>
+              </label>
+            </div>
+          </div>
+          <div class="options-notice options-notice--warning">
+            <strong>One purchase, exact listed price</strong>
+            <p>
+              Live mode accepts any valid listed price. Complete Neopets' confirmation checkbox
+              yourself. The extension submits that exact price once, verifies the result, and never
+              retries an uncertain result automatically.
+            </p>
+          </div>
+        </section>
         <section id="privacy" class="options-section" aria-labelledby="privacy-title">
           <div class="options-section__heading">
             <h2 id="privacy-title">Privacy &amp; Data</h2>
@@ -303,7 +363,7 @@
       </main>
     </div>
 
-    <dialog id="confirm-dialog" class="options-dialog">
+    <dialog id="confirm-dialog" class="options-dialog" aria-labelledby="confirm-title">
       <form method="dialog">
         <h2 id="confirm-title">Confirm action</h2>
         <p id="confirm-message"></p>

@@ -2,7 +2,10 @@
 
 Audit date: 2026-08-15
 
-Audited release: 7.13.0
+Historical audited release: 7.13.0
+
+The current 7.14.0 UI release is verified in docs/TEST_EVIDENCE.md. This report retains the earlier
+audit evidence.
 
 Manifest version: 3
 

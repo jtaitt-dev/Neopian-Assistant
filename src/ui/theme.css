@@ -1,0 +1,55 @@
+:where(.na-shell, .na-dialog, .na-ms-purchase-flow, html[data-na-ui]) {
+  --na-bg: #f8f5ec;
+  --na-surface: #fffdf8;
+  --na-surface-strong: #eeeee5;
+  --na-text: #17283e;
+  --na-muted: #576474;
+  --na-border: #e0ddcf;
+  --na-primary: #345cdd;
+  --na-primary-hover: #2449bf;
+  --na-on-primary: #ffffff;
+  --na-teal: #117c72;
+  --na-coral: #b93845;
+  --na-warning: #885b14;
+  --na-brass: #b59148;
+  --na-header: #17283e;
+  --na-heading-font: Georgia, "Times New Roman", serif;
+  --na-font: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --na-row-space: 12px;
+  color-scheme: light;
+}
+:where(.na-shell, .na-dialog, .na-ms-purchase-flow, html[data-na-ui])[data-theme="dark"] {
+  --na-bg: #122238;
+  --na-surface: #1c3047;
+  --na-surface-strong: #253b52;
+  --na-text: #f1eedd;
+  --na-muted: #b3c0cc;
+  --na-border: #304255;
+  --na-primary: #8dabff;
+  --na-primary-hover: #a9beff;
+  --na-on-primary: #122238;
+  --na-teal: #57d2bd;
+  --na-coral: #ff9aa3;
+  --na-warning: #eac681;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :where(.na-shell, .na-dialog, .na-ms-purchase-flow, html[data-na-ui])[data-theme="system"] {
+    --na-bg: #122238;
+    --na-surface: #1c3047;
+    --na-surface-strong: #253b52;
+    --na-text: #f1eedd;
+    --na-muted: #b3c0cc;
+    --na-border: #304255;
+    --na-primary: #8dabff;
+    --na-primary-hover: #a9beff;
+    --na-on-primary: #122238;
+    --na-teal: #57d2bd;
+    --na-coral: #ff9aa3;
+    --na-warning: #eac681;
+    color-scheme: dark;
+  }
+}
+:where(.na-shell, .na-dialog, html[data-na-ui])[data-density="compact"] {
+  --na-row-space: 8px;
+}

@@ -14,8 +14,9 @@ Thank you for helping improve Neopian Assistant.
   cancellable, quantity one, bounded by a hard maximum, fresh-state checked, duplicate-blocked,
   cross-tab locked, one-shot, and verified.
 - Keep MS Autobuy disabled by default, dry-run by default, exact-Kauvara-only, watchlist-bounded,
-  sequential, cancellable, price-capped, fresh-state checked, duplicate-blocked, and limited to one
-  exact haggle-page handoff. Offer entry and human verification must remain manual.
+  sequential, cancellable, fresh-state checked, duplicate-blocked, and limited to one exact
+  listed-price offer. Preserve the supported 1–999,999 NP range without adding a user price ceiling.
+  Official human verification remains manual; the offer is submitted once and its result verified.
 - Do not add CAPTCHA bypass, anti-bot evasion, stealth behavior, proxy rotation, credential access,
   cookie extraction, hidden automation, or blind retries of consequential actions.
 - Never commit real account data, credentials, browser profiles, logs, HAR files, screenshots with

@@ -2,6 +2,36 @@
 
 All notable project changes are documented here.
 
+## 7.14.0 — 2026-09-29
+
+### Changed
+
+- Introduced the premium Neopian companion visual system: ivory and navy surfaces, Georgia headings,
+  cobalt controls, teal status, restrained brass, and the original compass.
+- Unified light, dark, and system appearance across the dashboard, reviews, popup, settings, and
+  purchase banner.
+- Set new dashboard widths to 480px while retaining saved widths, clamping viewport geometry, and
+  keeping narrow tabs horizontally scrollable.
+- Moved daily availability above the list and added All, Ready, and On cooldown filters. Timer and
+  search updates preserve existing controls and scroll.
+- Added concise Configure disclosures, visible enablement and mode controls, readable watchlists and
+  pricing results, and consistent review dialogs.
+- Added contextual popup availability, active settings navigation, persistent save feedback, and MS
+  Autobuy preferences.
+- Added accessible tab keyboard navigation, dialog focus restoration, and reduced-motion support.
+- Updated packaging dependencies to patched fflate and sharp releases.
+- Rebuilt the README around the companion experience with current fixture screenshots, a quick
+  start, and a dedicated detailed user guide.
+
+### Fixed
+
+- Filtered daily reordering now identifies the selected routine in the underlying group.
+- Settings retain edits after a failed save or changes made during a pending save.
+- Monitor actions remain unavailable when a feature is disabled, unconfigured, or on the wrong page.
+
+Automation message contracts, schema 6, request pacing, cancellation, authorizations,
+acknowledgements, and purchase verification remain compatible.
+
 ## 7.13.0 — 2026-08-15
 
 Version 7.12.0 was increased to 7.13.0 because this release substantially expands the
