@@ -6,7 +6,7 @@ export const BRAND = Object.freeze({
     "Neopian Assistant is an unofficial fan-made extension and is not affiliated with, endorsed by, or sponsored by Neopets.",
 });
 
-export const APP_VERSION = "7.13.0";
+export const APP_VERSION = "7.14.0";
 export const SCHEMA_VERSION = 6;
 
 export const STORAGE_KEYS = Object.freeze({
@@ -95,7 +95,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   panel: {
     top: 20,
     right: 20,
-    width: 390,
+    width: 480,
     minimized: false,
   },
   dailiesEnabled: true,

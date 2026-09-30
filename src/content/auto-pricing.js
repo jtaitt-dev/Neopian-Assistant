@@ -1,4 +1,10 @@
 import { BRAND, MESSAGE_TYPES, SHOP_LIMITS } from "../shared/constants.js";
+import {
+  configureTool,
+  enhanceReviewDialog,
+  moveToolNotes,
+  showThemedDialog,
+} from "../shared/appearance.js";
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { calculateSuggestedPrice, isOwnShopStockUrl } from "../shared/validation.js";
 import { createTextFingerprint } from "../shared/pricing-operations.js";
@@ -44,15 +50,28 @@ export class AutoPricingController {
     this.reviewButton = null;
     this.lookupController = null;
     this.dialog = null;
+    this.configOpen = undefined;
   }
 
   get settings() {
     return this.data.settings.autoPricing;
   }
 
+  configurationSummary() {
+    const rule =
+      this.settings.rule === "match"
+        ? "Match lowest"
+        : this.settings.rule === "undercut"
+          ? "Undercut"
+          : "Above lowest";
+    return `${rule} · ${this.settings.amount.toLocaleString()} NP · ${this.settings.requestIntervalMs / 1000}s lookups`;
+  }
+
   async saveSettings() {
     await this.save();
     this.announce("Auto Pricing settings saved.", "success");
+    const summary = this.container?.querySelector(".na-configure__summary");
+    if (summary) summary.textContent = this.configurationSummary();
   }
 
   render(container) {
@@ -244,9 +263,16 @@ export class AutoPricingController {
     const actions = element("div", { className: "na-action-row" }, [startButton, cancelButton]);
     this.startButton = startButton;
     this.cancelButton = cancelButton;
+    const configuration = configureTool(settingsPanel, {
+      summary: this.configurationSummary(),
+      open: this.configOpen ?? false,
+      onToggle: (open) => {
+        this.configOpen = open;
+      },
+    });
     container.append(
       heading,
-      settingsPanel,
+      configuration,
       policy,
       requirement,
       actions,
@@ -255,6 +281,7 @@ export class AutoPricingController {
       this.resultList,
       this.reviewButton,
     );
+    moveToolNotes(container, configuration);
   }
 
   async send(message) {
@@ -429,7 +456,11 @@ export class AutoPricingController {
       });
       checkbox.addEventListener("change", () => {
         this.results[index].include = checkbox.checked;
-        this.renderResults();
+        const count = this.getChangedResults().length;
+        this.reviewButton.hidden = count === 0;
+        this.reviewButton.lastChild.textContent = `Review ${count} price change${count === 1 ? "" : "s"}`;
+        this.resultList.querySelector(".na-results-heading span").textContent =
+          `${count} selected changes`;
       });
       const itemCell = element("td", {}, [
         element("strong", { text: result.name }),
@@ -687,7 +718,8 @@ export class AutoPricingController {
       },
       { once: true },
     );
-    dialog.showModal();
+    enhanceReviewDialog(dialog);
+    showThemedDialog(dialog, this.data.settings);
     confirmation.focus();
   }
 

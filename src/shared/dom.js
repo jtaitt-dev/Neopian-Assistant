@@ -31,7 +31,8 @@ export function appendChildren(parent, children) {
 export function element(tagName, attributes = {}, children = []) {
   const node = document.createElement(tagName);
   for (const [name, value] of Object.entries(attributes)) {
-    if (value === null || value === undefined || value === false) continue;
+    if (value === null || value === undefined || (value === false && !name.startsWith("aria")))
+      continue;
     if (name === "className") node.className = value;
     else if (name === "text") node.textContent = value;
     else if (name === "style" && typeof value === "string") node.style.cssText = value;
@@ -86,4 +87,34 @@ export function labeledControl(labelText, control, hint = "") {
 export function setStatus(node, message, tone = "neutral") {
   node.textContent = message;
   node.dataset.tone = tone;
+}
+
+export function compassMark() {
+  const svg = document.createElementNS(SVG_NAMESPACE, "svg");
+  svg.setAttribute("viewBox", "0 0 128 128");
+  svg.setAttribute("class", "na-compass");
+  svg.setAttribute("aria-hidden", "true");
+  const shapes = [
+    ["rect", { width: 128, height: 128, rx: 28, fill: "#0b1f3a" }],
+    ["circle", { cx: 64, cy: 64, r: 38, fill: "#fff", opacity: ".98" }],
+    ["path", { d: "M64 15 73 52 113 64 73 76 64 113 55 76 15 64 55 52Z", fill: "#2563eb" }],
+    ["path", { d: "M64 31 69 56 97 64 69 72 64 97 59 72 31 64 59 56Z", fill: "#7dd3fc" }],
+    ["circle", { cx: 64, cy: 64, r: 12, fill: "#14b8a6", stroke: "#0b1f3a", "stroke-width": 5 }],
+    ["circle", { cx: 64, cy: 64, r: 4, fill: "#fff" }],
+    [
+      "path",
+      {
+        d: "M91 28h10M96 23v10M27 92h10M32 87v10",
+        stroke: "#fb7185",
+        "stroke-width": 5,
+        "stroke-linecap": "round",
+      },
+    ],
+  ];
+  for (const [tag, attributes] of shapes) {
+    const shape = document.createElementNS(SVG_NAMESPACE, tag);
+    for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, String(value));
+    svg.append(shape);
+  }
+  return svg;
 }

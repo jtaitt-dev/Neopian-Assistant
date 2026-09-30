@@ -58,6 +58,7 @@ async function buildAll() {
     cp(resolve(source, "options/index.html"), resolve(distribution, "options/index.html")),
     cp(resolve(source, "options/options.css"), resolve(distribution, "options/options.css")),
     cp(resolve(source, "ui/common.css"), resolve(distribution, "ui/common.css")),
+    cp(resolve(source, "ui/theme.css"), resolve(distribution, "ui/theme.css")),
     cp(resolve(source, "assets/icon.svg"), resolve(distribution, "icons/icon.svg")),
   ]);
   const iconSource = await readFile(resolve(source, "assets/icon.svg"));

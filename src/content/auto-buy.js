@@ -1,4 +1,10 @@
 import { MESSAGE_TYPES, PURCHASE_LIMITS, SHOP_LIMITS } from "../shared/constants.js";
+import {
+  configureTool,
+  enhanceReviewDialog,
+  moveToolNotes,
+  showThemedDialog,
+} from "../shared/appearance.js";
 import { element, icon, labeledControl, setStatus } from "../shared/dom.js";
 import { createTextFingerprint } from "../shared/pricing-operations.js";
 import { isShopWizardUrl, sanitizePurchaseWatchlist } from "../shared/validation.js";
@@ -30,6 +36,7 @@ export class AutoBuyController {
     this.purchaseFetcher = purchaseFetcher;
     this.status = null;
     this.dialog = null;
+    this.configOpen = undefined;
     this.monitoring = false;
     this.monitorRunId = null;
     this.monitorController = null;
@@ -104,6 +111,9 @@ export class AutoBuyController {
     dryRun.addEventListener("change", async () => {
       this.settings.dryRun = dryRun.checked;
       await this.saveSettings("SW Autobuy settings saved.");
+      reviewButton.lastChild.textContent = this.settings.dryRun
+        ? "Review dry run"
+        : "Review one purchase";
     });
     const maximumPrice = element("input", {
       type: "number",
@@ -300,6 +310,13 @@ export class AutoBuyController {
     );
     this.monitorResultsRoot = element("div", { className: "na-watchlist-results" });
     this.renderMonitorResults();
+    const configuration = configureTool(settingsPanel, {
+      summary: `${this.settings.watchlist.length}/10 names · Up to ${this.settings.maximumPrice.toLocaleString()} NP`,
+      open: this.configOpen ?? this.settings.watchlist.length === 0,
+      onToggle: (open) => {
+        this.configOpen = open;
+      },
+    });
     container.append(
       element("div", { className: "na-section-heading" }, [
         element("div", {}, [
@@ -309,7 +326,7 @@ export class AutoBuyController {
           }),
         ]),
       ]),
-      settingsPanel,
+      configuration,
       element("div", { className: "na-notice na-notice--warning" }, [
         icon("info"),
         element("p", {
@@ -331,6 +348,7 @@ export class AutoBuyController {
       this.monitorResultsRoot,
       this.status,
     );
+    moveToolNotes(container, configuration);
   }
 
   isMonitorActive(runId) {
@@ -338,7 +356,12 @@ export class AutoBuyController {
   }
 
   syncMonitorControls() {
-    if (this.monitorStartButton) this.monitorStartButton.disabled = this.monitoring;
+    if (this.monitorStartButton)
+      this.monitorStartButton.disabled =
+        this.monitoring ||
+        !this.settings.enabled ||
+        this.settings.watchlist.length === 0 ||
+        !isShopWizardUrl(window.location.href);
     if (this.monitorStopButton) this.monitorStopButton.disabled = !this.monitoring;
   }
 
@@ -381,7 +404,10 @@ export class AutoBuyController {
         {
           className: "na-button na-button--secondary na-button--small",
           type: "button",
-          disabled: result.state !== "ready",
+          disabled:
+            result.state !== "ready" ||
+            !this.settings.enabled ||
+            !isShopWizardUrl(window.location.href),
           onClick: () => this.beginReview(result.candidate),
         },
         "Review",
@@ -717,7 +743,8 @@ export class AutoBuyController {
       },
       { once: true },
     );
-    dialog.showModal();
+    enhanceReviewDialog(dialog);
+    showThemedDialog(dialog, this.data.settings);
     confirmation.focus();
   }
 

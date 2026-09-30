@@ -1,14 +1,69 @@
 # Validation and Browser Evidence
 
-Evidence date: 2026-08-15
+## 7.14.0 premium companion verification — 2026-09-29
 
-Current production build: Neopian Assistant 7.13.0 (`dist/`)
+Current production build: Neopian Assistant **7.14.0** (dist/).
 
-Current release package: `release/neopian-assistant-7.13.0.zip`
+Current release package: release/neopian-assistant-7.14.0.zip.
+
+- Repository verification: Prettier, Biome (no warnings), 106 Node behavioral tests, esbuild,
+  Manifest V3/file/icon/CSP/version validation, and secret scanning.
+- Patched packaging dependencies: fflate 0.8.3 and sharp 0.35.5; dependency audit reports zero
+  vulnerabilities.
+- Added behavioral regressions for filtered reordering by identity, availability counts and combined
+  filters, timer/search node and scroll preservation, default versus saved widths, viewport
+  geometry, themed dialog focus restoration, disclosure setup, complete tab associations and manual
+  keyboard activation, and settings save/failure/concurrent-edit states.
+- Installed the built extension in an isolated Chromium profile with synthetic Neopets routes and
+  local fixture data. Browser plugin was unavailable; regular Playwright used the existing Chromium
+  binary. No account cookies or live transaction were used.
+- Rendered all four tools in light and dark themes, comfortable and compact density, and
+  340/480/640px widths: 48 base combinations. Shop configuration was also checked open at all three
+  widths. Short 390x440 viewports retain scrollable bodies and preserve the stored 640px preference.
+- Exercised daily search/filters/management, timer focus preservation after a real 30-second tick,
+  arrow/Home/End focus navigation, Enter and Space activation, minimize/expand, pointer dragging,
+  native resizing and persistence, close/reopen, and dialog focus restoration.
+- Exercised pricing scans, selection, mandatory review acknowledgement and dry-run completion; MS
+  fresh-stock matching and dry-run review; SW start/stop and exact-listing review. Existing worker
+  authorizations and pacing remained active.
+- Exercised disabled, unavailable, empty, running, stopped, failed and uncertain states. HTTP 503
+  responses were deliberately injected to check failures. An intercepted local synthetic purchase
+  response recorded an uncertain outcome and instructed inventory inspection instead of claiming
+  success; no request reached a real purchase endpoint.
+- Exercised settings unchanged, unsaved, saving, failed, retry and saved states, retained edits
+  after a forced storage failure, active navigation, 340px persistent save controls, both themes,
+  system appearance, reduced motion, and dark confirmation dialogs. Popup fixtures identified
+  Kauvara and global disablement accurately.
+- No unexpected browser runtime or console errors. Expected HTTP 503 console entries belong to
+  intentional failure fixtures. Page identity, meaningful content, absence of error overlays,
+  screenshot evidence, and interaction checks passed.
+
+### Concept comparison
+
+Compared typography, exact visible copy, palette, spacing, and artwork against the approved Dailies,
+pricing/review, monitoring, and popup/settings concepts. Corrected host-page style leakage, SVG
+resets, modal spacing, switches, expanded fields, status tones, and minimize precedence during the
+loop. Intentional differences: the original compass and official daily artwork are retained; routine
+notes and the full disclaimer remain visible; shop lists omit unsupported thumbnails; counts and
+prices reflect fixture data. Screenshots and temporary QA scripts remain outside the repository.
+
+### Practical limits
+
+Validation used an installed extension with synthetic routes, dry runs, and a locally intercepted
+uncertain-response fixture. No live Neopets purchase, offer, or price update was attempted.
+Historical live-site evidence below belongs to earlier releases.
+
+## Historical verification
+
+Historical evidence date: 2026-08-15
+
+Historical production build: Neopian Assistant 7.13.0 (`dist/`)
+
+Historical release package: `release/neopian-assistant-7.13.0.zip`
 
 ## Automated validation
 
-The current 7.13.0 build passed:
+The historical 7.13.0 build passed:
 
 - Prettier formatting verification.
 - Biome lint with no warnings.
@@ -259,7 +314,7 @@ clicked, solved, bypassed, or represented as verified by the extension. The two 
 were cropped to the extension root; they contain no account identity, balance, cookie, token,
 object/stock ID, raw response, or browser-profile data.
 
-## Current 7.13.0 MS Autobuy installed-build evidence
+## Historical 7.13.0 MS Autobuy installed-build evidence
 
 The unpacked extension was rebuilt from `dist/`, reloaded through Chrome's visible extension
 control, and Chrome's details page confirmed version 7.13.0 from

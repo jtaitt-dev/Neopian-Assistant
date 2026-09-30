@@ -49,6 +49,10 @@ async function initialize() {
       sendResponse({ ok: false });
       return false;
     }
+    if (app.root.isConnected === false) {
+      app.closedForPage = false;
+      app.mount();
+    }
     if (app.data.settings.panel.minimized) void app.toggleMinimized();
     app.root.focus({ preventScroll: true });
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {

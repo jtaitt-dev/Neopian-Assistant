@@ -1,4 +1,6 @@
 import { APP_VERSION, STORAGE_KEYS } from "../shared/constants.js";
+import { applyAppearance, showThemedDialog } from "../shared/appearance.js";
+import { SettingsSaveState } from "../shared/settings-save-state.js";
 import { setStatus } from "../shared/dom.js";
 import {
   clearAllData,
@@ -29,10 +31,75 @@ const controls = {
   buyingMaximumPrice: document.getElementById("buying-maximum-price"),
   buyingWatchlist: document.getElementById("buying-watchlist"),
   buyingInterval: document.getElementById("buying-interval"),
+  mainShopEnabled: document.getElementById("main-shop-enabled"),
+  mainShopDryRun: document.getElementById("main-shop-dry-run"),
+  mainShopInterval: document.getElementById("main-shop-interval"),
+  mainShopWatchlist: document.getElementById("main-shop-watchlist"),
 };
 
 const status = document.getElementById("status");
 const settingsRoot = document.getElementById("settings");
+
+const saveButton = document.getElementById("save");
+const saveStates = {
+  unchanged: ["No changes", "neutral"],
+  unsaved: ["Unsaved changes", "warning"],
+  saving: ["Saving changes…", "neutral"],
+  saved: ["Changes saved", "success"],
+  failed: ["Save failed. Your edits are here; try again.", "error"],
+};
+const saveState = new SettingsSaveState(
+  () =>
+    JSON.stringify(
+      Object.values(controls).map((control) =>
+        control.type === "checkbox" ? control.checked : control.value,
+      ),
+    ),
+  (state) => {
+    saveButton.disabled = state === "unchanged" || state === "saving" || state === "saved";
+    saveButton.textContent =
+      state === "saving" ? "Saving…" : state === "failed" ? "Retry save" : "Save changes";
+    status.dataset.saveState = state;
+    setStatus(status, ...saveStates[state]);
+  },
+);
+
+function updateAppearance() {
+  applyAppearance(document.documentElement, {
+    theme: controls.theme.value,
+    density: controls.density.value,
+  });
+  for (const radio of document.querySelectorAll(".ui-segmented input")) {
+    radio.checked = radio.value === controls[radio.name].value;
+  }
+}
+
+function createSegments(name, choices) {
+  const control = controls[name];
+  control.hidden = true;
+  const group = document.createElement("fieldset");
+  group.className = "ui-segmented";
+  const legend = document.createElement("legend");
+  legend.className = "ui-visually-hidden";
+  legend.textContent = name === "theme" ? "Theme" : "Panel density";
+  group.append(legend);
+  for (const [value, title] of choices) {
+    const label = document.createElement("label");
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = name;
+    radio.value = value;
+    const text = document.createElement("span");
+    text.textContent = title;
+    label.append(radio, text);
+    group.append(label);
+    radio.addEventListener("change", () => {
+      control.value = value;
+      control.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+  control.after(group);
+}
 
 function populateControls() {
   controls.enabled.checked = data.settings.enabled;
@@ -51,6 +118,11 @@ function populateControls() {
   controls.buyingMaximumPrice.value = data.settings.autoBuy.maximumPrice;
   controls.buyingWatchlist.value = data.settings.autoBuy.watchlist.join("\n");
   controls.buyingInterval.value = Math.round(data.settings.autoBuy.requestIntervalMs / 1000);
+  controls.mainShopEnabled.checked = data.settings.mainShopBuy.enabled;
+  controls.mainShopDryRun.checked = data.settings.mainShopBuy.dryRun;
+  controls.mainShopInterval.value = Math.round(data.settings.mainShopBuy.requestIntervalMs / 1000);
+  controls.mainShopWatchlist.value = data.settings.mainShopBuy.watchlist.join("\n");
+  updateAppearance();
 }
 
 function collectControls() {
@@ -72,22 +144,48 @@ function collectControls() {
   data.settings.autoBuy.watchlist = controls.buyingWatchlist.value.split(/\r?\n/);
   data.settings.autoBuy.requestIntervalMs =
     Number.parseInt(controls.buyingInterval.value, 10) * 1000;
+  data.settings.mainShopBuy.enabled = controls.mainShopEnabled.checked;
+  data.settings.mainShopBuy.dryRun = controls.mainShopDryRun.checked;
+  data.settings.mainShopBuy.requestIntervalMs =
+    Number.parseInt(controls.mainShopInterval.value, 10) * 1000;
+  data.settings.mainShopBuy.watchlist = controls.mainShopWatchlist.value.split(/\r?\n/);
 }
 
 async function save() {
-  const saveButton = document.getElementById("save");
-  saveButton.disabled = true;
-  setStatus(status, "Saving changes…", "neutral");
-  try {
-    collectControls();
-    data = await saveAppData(data);
-    populateControls();
-    setStatus(status, "All changes saved.", "success");
-  } catch {
-    setStatus(status, "Settings could not be saved. No confirmation was recorded.", "error");
-  } finally {
-    saveButton.disabled = false;
+  if (!data) return;
+  for (const control of Object.values(controls)) {
+    if (!control.checkValidity()) {
+      control.reportValidity();
+      return;
+    }
   }
+  for (const [control, limit] of [
+    [controls.buyingWatchlist, 10],
+    [controls.mainShopWatchlist, 100],
+  ]) {
+    const names = control.value
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (names.length > limit || names.some((name) => Array.from(name).length > 100)) {
+      setStatus(
+        status,
+        `Use up to ${limit} item names, each at most 100 characters. Your edits remain here.`,
+        "error",
+      );
+      control.focus();
+      return;
+    }
+  }
+  await saveState.save(
+    async () => {
+      collectControls();
+      const result = await saveAppData(data);
+      data = result;
+      return result;
+    },
+    () => populateControls(),
+  );
 }
 
 function downloadExport() {
@@ -116,7 +214,7 @@ function confirmAction(title, message, confirmLabel) {
   document.getElementById("confirm-message").textContent = message;
   document.getElementById("confirm-action").textContent = confirmLabel;
   dialog.returnValue = "cancel";
-  dialog.showModal();
+  showThemedDialog(dialog, { theme: controls.theme.value, density: controls.density.value });
   return new Promise((resolve) => {
     dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), {
       once: true,
@@ -162,6 +260,7 @@ async function importData(file) {
   try {
     data = await saveAppData(imported);
     populateControls();
+    saveState.loaded();
     await renderOperationHistory();
     await renderPurchaseHistory();
     setStatus(status, "Validated extension data imported successfully.", "success");
@@ -184,6 +283,7 @@ async function clearData() {
     data = await clearAllData();
     data = await saveAppData(data);
     populateControls();
+    saveState.loaded();
     await renderOperationHistory();
     await renderPurchaseHistory();
     setStatus(status, "Local extension data was cleared and defaults were restored.", "success");
@@ -256,10 +356,11 @@ async function initialize() {
   try {
     data = await loadAppData();
     populateControls();
+    saveState.loaded();
     await renderOperationHistory();
     await renderPurchaseHistory();
     settingsRoot.setAttribute("aria-busy", "false");
-    setStatus(status, "Settings loaded.", "success");
+    saveState.loaded();
   } catch {
     settingsRoot.setAttribute("aria-busy", "false");
     settingsRoot.setAttribute("aria-disabled", "true");
@@ -280,7 +381,48 @@ document.getElementById("import").addEventListener("change", (event) => {
 document.getElementById("clear").addEventListener("click", clearData);
 
 for (const control of Object.values(controls)) {
-  control.addEventListener("change", () => setStatus(status, "Unsaved changes.", "warning"));
+  for (const event of ["input", "change"])
+    control.addEventListener(event, () => {
+      if (!data) return;
+      updateAppearance();
+      saveState.changed();
+    });
 }
 
+createSegments("theme", [
+  ["system", "System"],
+  ["light", "Light"],
+  ["dark", "Dark"],
+]);
+createSegments("density", [
+  ["comfortable", "Comfortable"],
+  ["compact", "Compact"],
+]);
+const links = [...document.querySelectorAll(".options-nav a")];
+const sections = [...document.querySelectorAll(".options-section")];
+function updateSection() {
+  const offset =
+    document.querySelector(".options-header").getBoundingClientRect().height +
+    (window.innerWidth <= 820
+      ? document.querySelector(".options-nav").getBoundingClientRect().height
+      : 0) +
+    24;
+  const active =
+    sections.filter((section) => section.getBoundingClientRect().top <= offset).at(-1) ??
+    sections[0];
+  for (const link of links) {
+    if (link.hash === `#${active.id}`) link.setAttribute("aria-current", "location");
+    else link.removeAttribute("aria-current");
+  }
+}
+window.addEventListener("scroll", updateSection, { passive: true });
+window.addEventListener("resize", updateSection);
+const headerObserver = new ResizeObserver(() => {
+  document.documentElement.style.setProperty(
+    "--options-header-height",
+    `${Math.ceil(document.querySelector(".options-header").getBoundingClientRect().height)}px`,
+  );
+});
+headerObserver.observe(document.querySelector(".options-header"));
+updateSection();
 void initialize();
