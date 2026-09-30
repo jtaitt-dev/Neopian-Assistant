@@ -252,10 +252,14 @@ test("MS Autobuy live monitoring arms one exact purchase without a price ceiling
     const container = document.createElement("div");
     document.body.append(container);
     controller.render(container);
+    const runMonitor = controller.runMonitor.bind(controller);
+    let monitorRun;
+    controller.runMonitor = (runId) => {
+      monitorRun = runMonitor(runId);
+      return monitorRun;
+    };
     controller.startMonitoring();
-    for (let attempt = 0; attempt < 5 && launches === 0; attempt += 1) {
-      await new Promise((resolve) => setImmediate(resolve));
-    }
+    await monitorRun;
     assert.equal(launches, 1);
     assert.equal(controller.monitoring, false);
     assert.equal(controller.dialog, null);

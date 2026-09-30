@@ -28,6 +28,9 @@ All notable project changes are documented here.
 - Filtered daily reordering now identifies the selected routine in the underlying group.
 - Settings retain edits after a failed save or changes made during a pending save.
 - Monitor actions remain unavailable when a feature is disabled, unconfigured, or on the wrong page.
+- The MS Autobuy regression awaits monitoring completion instead of a timing-dependent event-loop
+  count.
+- Enforced LF text checkout endings so Windows builds agree with the formatter and CI.
 
 Automation message contracts, schema 6, request pacing, cancellation, authorizations,
 acknowledgements, and purchase verification remain compatible.
