@@ -14,6 +14,10 @@ Current release package: release/neopian-assistant-7.14.0.zip.
   filters, timer/search node and scroll preservation, default versus saved widths, viewport
   geometry, themed dialog focus restoration, disclosure setup, complete tab associations and manual
   keyboard activation, and settings save/failure/concurrent-edit states.
+- The MS live-monitor regression awaits actual monitor completion, including asynchronous
+  fingerprint creation and authorization, rather than assuming a fixed number of event-loop turns.
+  The corrected regression passed 20 consecutive local runs. LF checkout attributes keep Windows
+  text files consistent with the formatter and CI.
 - Installed the built extension in an isolated Chromium profile with synthetic Neopets routes and
   local fixture data. Browser plugin was unavailable; regular Playwright used the existing Chromium
   binary. No account cookies or live transaction were used.
@@ -45,7 +49,8 @@ pricing/review, monitoring, and popup/settings concepts. Corrected host-page sty
 resets, modal spacing, switches, expanded fields, status tones, and minimize precedence during the
 loop. Intentional differences: the original compass and official daily artwork are retained; routine
 notes and the full disclaimer remain visible; shop lists omit unsupported thumbnails; counts and
-prices reflect fixture data. Screenshots and temporary QA scripts remain outside the repository.
+prices reflect fixture data. Selected product screenshots are in docs/images/ and the README;
+temporary QA scripts, browser profiles, and the full capture matrix remain outside the repository.
 
 ### Practical limits
 
